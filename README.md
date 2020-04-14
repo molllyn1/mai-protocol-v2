@@ -9,7 +9,7 @@ The name Mai comes from two Chinese characters "买" which means buy and "卖" w
 
 ## Key Fetures
 
-- Isoluted margin account management
+- Isolated margin account management
 - Trade & manage the position
 - AMM to provide on-chain liquidity & funding rate
 - Funding payment between long/short postions
