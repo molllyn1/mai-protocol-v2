@@ -1,7 +1,7 @@
 # MAI PROTOCOL V2 - PERPETUAL CONTRACT
 
-![BuildingStatus](https://github.com/mcarloai/mai-protocol-v2/workflows/build/badge.svg)
-![CoverageStatus](https://github.com/mcarloai/mai-protocol-v2/raw/coverage/.coverage.svg?sanitize=true)
+[![Build Status](https://travis-ci.org/mcdexio/mai-protocol-v2.svg?branch=master)](https://travis-ci.org/mcdexio/mai-protocol)
+[![Coverage Status](https://coveralls.io/repos/github/mcdexio/mai-protocol-v2/badge.svg?branch=master)](https://coveralls.io/github/mcdexio/mai-protocol-v2?branch=master)
 
 Mai Protocol V2 builds the decentrialized Perptual contracts on Ethereum.
 
