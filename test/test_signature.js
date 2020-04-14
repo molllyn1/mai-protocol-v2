@@ -29,28 +29,6 @@ contract('signature', accounts => {
 
     before(deploy);
 
-    it("expire at", async () => {
-        const perpetualAddress = "0x4DA467821456Ca82De42fa691ddA08B24A4f0572";
-        const orderA = await buildOrder({
-            trader: u1,
-            amount: toWad(1),
-            price: toWad(6000),
-            version: 2,
-            side: 'sell',
-            type: 'market',
-            expiredAt: 1589366656,
-            salt: 666,
-        }, perpetualAddress, admin);
-        const ts = await testOrder.getOrderExpiredAt({
-            trader: orderA.trader,
-            amount: orderA.amount,
-            price: orderA.price,
-            data: orderA.data,
-            signature: orderA.signature,
-        }, {})
-        console.log(ts.toString());
-    });
-
     it("generate signature", async () => {
         const perpetualAddress = "0x4DA467821456Ca82De42fa691ddA08B24A4f0572";
         const orderA = await buildOrder({
