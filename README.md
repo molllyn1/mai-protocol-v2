@@ -18,3 +18,4 @@ The name Mai comes from two Chinese characters "买" which means buy and "卖" w
 - Insurance fund
 - Socialize the the liquidition loss
 - Global settlement when an emergency to keep the users’ assets safe
+
