@@ -13,8 +13,6 @@ contract Position is Collateral, PerpetualGovernance {
     using LibTypes for LibTypes.Side;
 
     int256 public insuranceFundBalance;
-
-    int256[3] internal socialLossPerContracts;
     uint256[3] internal totalSizes;
     mapping(address => LibTypes.PositionAccount) internal positions;
 
@@ -83,15 +81,6 @@ contract Position is Collateral, PerpetualGovernance {
         socialLossPerContracts[uint256(side)] = newVal;
         emit SocialLoss(side, newVal);
     }
-
-    function averageEntryPrice(address guy) internal view returns (uint256) {
-        LibTypes.PositionAccount storage account = positions[guy];
-        if (account.size == 0) {
-            return 0;
-        }
-        return account.entryValue.wdiv(account.size);
-    }
-
     function marginBalanceWithPrice(address guy, uint256 markPrice) internal returns (int256) {
         return cashBalances[guy].balance.add(pnlWithPrice(guy, markPrice));
     }

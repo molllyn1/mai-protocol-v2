@@ -71,13 +71,6 @@ contract('TestPosition', accounts => {
         const positionAccount = await position.getPosition(user);
         return positionAccount.side;
     }
-    const positionAverageEntryPrice = async (user) => {
-        const positionAccount = await position.getPosition(user);
-        if (positionAccount.size == 0) {
-            return 0;
-        }
-        return positionAccount.entryValue * 1e18 / positionAccount.size;
-    }
     const positionEntryValue = async (user) => {
         const positionAccount = await position.getPosition(user);
         return positionAccount.entryValue;
@@ -108,9 +101,6 @@ contract('TestPosition', accounts => {
         });
 
         it('get position', async () => {
-
-            await positionAverageEntryPrice(u1);
-
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(position.address, infinity, {
                 from: u1
@@ -699,13 +689,12 @@ contract('TestPosition', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            assert.equal(fromWad(await positionAverageEntryPrice(u1)), 0);
+            assert.equal(fromWad(await positionEntryValue(u1)), 0);
 
 
             await position.tradePublic(u1, LONG, toWad(6000), toWad(0.5));
             assert.equal(fromWad(await positionSize(u1)), 0.5);
             assert.equal(await positionSide(u1), LONG);
-            assert.equal(fromWad(await positionAverageEntryPrice(u1)), 6000);
             assert.equal(fromWad(await positionEntryValue(u1)), 3000);
             assert.equal(fromWad(await positionEntrySocialLoss(u1)), 0);
             assert.equal(fromWad(await positionEntryFundingLoss(u1)), 0);
@@ -720,7 +709,6 @@ contract('TestPosition', accounts => {
             await position.tradePublic(u1, LONG, toWad(8000), toWad(0.5));
             assert.equal(fromWad(await positionSize(u1)), 1);
             assert.equal(await positionSide(u1), LONG);
-            assert.equal(fromWad(await positionAverageEntryPrice(u1)), 7000);
             assert.equal(fromWad(await positionEntryValue(u1)), 7000);
             assert.equal(fromWad(await positionEntrySocialLoss(u1)), 0);
             assert.equal(fromWad(await positionEntryFundingLoss(u1)), 0);
@@ -735,7 +723,6 @@ contract('TestPosition', accounts => {
             await position.tradePublic(u1, SHORT, toWad(9000), toWad(1.5));
             assert.equal(fromWad(await positionSize(u1)), 0.5);
             assert.equal(await positionSide(u1), SHORT);
-            assert.equal(fromWad(await positionAverageEntryPrice(u1)), 9000);
             assert.equal(fromWad(await positionEntryValue(u1)), 4500);
             assert.equal(fromWad(await positionEntrySocialLoss(u1)), 0);
             assert.equal(fromWad(await positionEntryFundingLoss(u1)), 0);

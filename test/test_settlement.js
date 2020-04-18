@@ -4,7 +4,6 @@ const {
     increaseEvmBlock,
     increaseEvmTime,
     createEVMSnapshot,
-    restoreEVMSnapshotsnapshotId,
     toBytes32,
     assertApproximate
 } = require('./funcs');
@@ -52,8 +51,6 @@ contract('statement', accounts => {
         u2,
         u3,
     };
-
-    let snapshotId;
 
     const increaseBlockBy = async (n) => {
         for (let i = 0; i < n; i++) {
@@ -148,17 +145,12 @@ contract('statement', accounts => {
     }
 
     beforeEach(async () => {
-        snapshotId = await createEVMSnapshot();
         await deploy();
         await useDefaultGlobalConfig();
         await useDefaulGovParamters();
         await usePoolDefaultParamters();
         await setBroker(u1, proxy.address);
     });
-
-    afterEach(async function() {
-        await restoreEVMSnapshotsnapshotId(snapshotId);
-	});
 
     beforeEach(async () => {
         // index
@@ -199,32 +191,177 @@ contract('statement', accounts => {
         await perpetual.addWhitelisted(admin);
     });
 
+    it("set socialloss on settling", async () => {
+        await perpetual.deposit(toWad(7000), {from: u2});
+        await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+
+        try {
+            await perpetual.setGovernanceParameter(toBytes32("longSocialLossPerContracts"), toWad(10000));
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"))
+        }
+
+        const pnl = (await  perpetual.pnl.call(u2)).toString();
+        await perpetual.beginGlobalSettlement(toWad(7000));
+        assert.equal(pnl, (await perpetual.pnl.call(u2)).toString());
+
+        await perpetual.setGovernanceParameter(toBytes32("longSocialLossPerContracts"), toWad(666));
+        var newPnl = (await  perpetual.pnl.call(u2)).toString();
+        var deltaPnl = (new BigNumber(pnl).minus(new BigNumber(newPnl))).toFixed();
+        assert.equal(deltaPnl, toWad(666));
+
+
+        await perpetual.setGovernanceParameter(toBytes32("longSocialLossPerContracts"), toWad(123.4));
+        var newPnl = (await  perpetual.pnl.call(u2)).toString();
+        var deltaPnl = (new BigNumber(pnl).minus(new BigNumber(newPnl))).toFixed();
+        assert.equal(deltaPnl, toWad(123.4));
+
+
+        await perpetual.endGlobalSettlement();
+
+        try {
+            await perpetual.setGovernanceParameter(toBytes32("longSocialLossPerContracts"), toWad(10000));
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"))
+        }
+
+    })
+
+    it("set balance on settling", async () => {
+        await perpetual.deposit(toWad(7000), {from: u2});
+        await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+
+        const token = (await collateral.balanceOf(u2)).toString();
+        const total = (await perpetual.marginBalance.call(u2)).toString();
+        assert.equal(total, "6105555555555555555554");
+
+        await perpetual.beginGlobalSettlement(toWad(7000));
+        await perpetual.endGlobalSettlement();
+
+        await perpetual.settle({from: u2});
+        assert.equal((await collateral.balanceOf(u2)).toString(), (new BigNumber(token).plus(new BigNumber(total))).toFixed())
+        // console.log((await collateral.balanceOf(u2)).toString());
+    })
+
+
+    it("set balance on settling 2", async () => {
+        await perpetual.deposit(toWad(7000), {from: u2});
+        await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+
+        const token = (await collateral.balanceOf(u2)).toString();
+        const total = (await perpetual.marginBalance.call(u2)).toString();
+        assert.equal(total, "6105555555555555555554");
+
+        const cash = fromWad((await perpetual.getCashBalance(u2)).balance);
+
+        await perpetual.beginGlobalSettlement(toWad(7000));
+        try {
+            await perpetual.setCashBalance(u2, toWad(998, cash), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("caller does not have the WhitelistAdmin role"))
+        }
+        await perpetual.setCashBalance(u2, toWad(998, cash));
+        await perpetual.endGlobalSettlement();
+
+        await perpetual.settle({from: u2});
+        assert.equal((await collateral.balanceOf(u2)).toString(), (new BigNumber(token).plus(new BigNumber(total))).plus(new BigNumber(toWad(998))).toFixed())
+        // console.log((await collateral.balanceOf(u2)).toString());
+    })
+
+    it("set balance on settling 2", async () => {
+        await perpetual.deposit(toWad(7000), {from: u2});
+        await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+
+        const token = (await collateral.balanceOf(u2)).toString();
+        const total = (await perpetual.marginBalance.call(u2)).toString();
+        const pnl = (await perpetual.pnl.call(u2)).toString();
+        // assert.equal(pnl, "-777777777777777777779");
+
+        const cash = fromWad((await perpetual.getCashBalance(u2)).balance);
+
+        await perpetual.beginGlobalSettlement(toWad(7000));
+        await perpetual.setCashBalance(u2, "777777777777777777779");
+        await perpetual.endGlobalSettlement();
+
+        await perpetual.settle({from: u2});
+        assert.equal((await collateral.balanceOf(u2)).toString(), token);
+        // console.log((await collateral.balanceOf(u2)).toString());
+    })
+
     it("settling forbids", async () => {
         await perpetual.deposit(toWad(6000), {from: u2});
         await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
 
         await perpetual.beginGlobalSettlement(toWad(6000));
 
-        const forbids = [
-            amm.buy(toWad(1), toWad('10000'), infinity, {from: u2}),
-            amm.buyFromWhitelisted(u2, toWad(1), toWad('10000'), infinity),
-            amm.sell(toWad(1), toWad('0'), infinity, {from: u2}),
-            amm.sellFromWhitelisted(u2, toWad(1), toWad('0'), infinity),
-            amm.depositAndBuy(toWad('100'), toWad(1), toWad('10000'), infinity, {from: u2}),
-            amm.depositAndSell(toWad('100'), toWad(1), toWad('0'), infinity, {from: u2}),
-            amm.addLiquidity(toWad(1), {from: u2}),
-            amm.removeLiquidity(toWad(1), {from: u2}),
-            // amm.createPool(toWad(1), {from: u2}),
-            // perpetual.withdraw(toWad(1), {from: u2}),
-            // perpetual.withdrawFor(u2, toWad(1)),
-        ]
-        for (let i = 0; i < forbids.length; i++) {
-            try {
-                await forbids[i];
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("wrong perpetual status"), error);
-            }
+        try {
+            await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.buyFromWhitelisted(u2, toWad(1), toWad('10000'), infinity);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.sell(toWad(1), toWad('0'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.sellFromWhitelisted(u2, toWad(1), toWad('0'), infinity);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.depositAndBuy(toWad('100'), toWad(1), toWad('10000'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.depositAndSell(toWad('100'), toWad(1), toWad('0'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.addLiquidity(toWad(1), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.removeLiquidity(toWad(1), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.createPool(toWad(1), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await perpetual.withdraw(toWad(1), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await perpetual.withdrawFor(u2, toWad(1));
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
         }
     });
 
@@ -252,24 +389,59 @@ contract('statement', accounts => {
         await perpetual.beginGlobalSettlement(toWad(6000));
         await perpetual.endGlobalSettlement();
 
-        const forbids = [
-            amm.buy(toWad(1), toWad('10000'), infinity, {from: u2}),
-            amm.buyFromWhitelisted(u2, toWad(1), toWad('10000'), infinity),
-            amm.sell(toWad(1), toWad('0'), infinity, {from: u2}),
-            amm.sellFromWhitelisted(u2, toWad(1), toWad('0'), infinity),
-            amm.depositAndBuy(toWad('100'), toWad(1), toWad('10000'), infinity, {from: u2}),
-            amm.depositAndSell(toWad('100'), toWad(1), toWad('0'), infinity, {from: u2}),
-            amm.addLiquidity(toWad(1), {from: u2}),
-            amm.removeLiquidity(toWad(1), {from: u2}),
-            amm.createPool(toWad(1), {from: u2}),
-        ]
-        for (let i = 0; i < forbids.length; i++) {
-            try {
-                await forbids[i];
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("wrong perpetual status"), i);
-            }
+        try {
+            await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.buyFromWhitelisted(u2, toWad(1), toWad('10000'), infinity);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.sell(toWad(1), toWad('0'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.sellFromWhitelisted(u2, toWad(1), toWad('0'), infinity);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.depositAndBuy(toWad('100'), toWad(1), toWad('10000'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.depositAndSell(toWad('100'), toWad(1), toWad('0'), infinity, {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.addLiquidity(toWad(1), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.removeLiquidity(toWad(1), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
+        }
+        try {
+            await amm.createPool(toWad(1), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"), error);
         }
     });
 

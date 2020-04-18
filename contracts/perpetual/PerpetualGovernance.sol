@@ -21,6 +21,7 @@ contract PerpetualGovernance is WhitelistedRole {
     LibTypes.Status public status;
     uint256 public settlementPrice;
     LibTypes.PerpGovernanceConfig internal governance;
+    int256[3] internal socialLossPerContracts;
 
     event BeginGlobalSettlement(uint256 price);
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
@@ -66,6 +67,12 @@ contract PerpetualGovernance is WhitelistedRole {
         } else if (key == "tradingLotSize") {
             require(governance.lotSize == 0 || value.toUint256().mod(governance.lotSize) == 0, "require tls % ls == 0");
             governance.tradingLotSize = value.toUint256();
+        } else if (key == "longSocialLossPerContracts") {
+            require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+            socialLossPerContracts[uint256(LibTypes.Side.LONG)] = value;
+        } else if (key == "shortSocialLossPerContracts") {
+            require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+            socialLossPerContracts[uint256(LibTypes.Side.SHORT)] = value;
         } else {
             revert("key not exists");
         }

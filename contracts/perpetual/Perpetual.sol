@@ -22,7 +22,7 @@ contract Perpetual is Brokerage, Position {
     using SafeERC20 for IERC20;
     uint256 public totalAccounts;
     address[] public accountList;
-    mapping(address => bool) public accountCreated;
+    mapping(address => bool) private accountCreated;
 
     event CreatePerpetual();
     event CreateAccount(uint256 indexed id, address indexed guy);
@@ -38,6 +38,14 @@ contract Perpetual is Brokerage, Position {
         setGovernanceAddress("globalConfig", globalConfig);
         setGovernanceAddress("dev", devAddress);
         emit CreatePerpetual();
+    }
+
+    // Admin functions
+    function setCashBalance(address guy, int256 amount) public onlyWhitelistAdmin {
+        require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+        int256 deltaAmount = amount.sub(cashBalances[guy].balance);
+        cashBalances[guy].balance = amount;
+        emit InternalUpdateBalance(guy, deltaAmount, amount);
     }
 
     // Public functions

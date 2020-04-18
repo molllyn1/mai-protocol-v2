@@ -136,13 +136,6 @@ contract('exchange-amm', accounts => {
         const positionAccount = await perpetual.getPosition(user);
         return positionAccount.side;
     }
-    const positionAverageEntryPrice = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
-        if (positionAccount.size == 0) {
-            return 0;
-        }
-        return positionAccount.entryValue * 1e18 / positionAccount.size;
-    }
     const positionEntryValue = async (user) => {
         const positionAccount = await perpetual.getPosition(user);
         return positionAccount.entryValue;

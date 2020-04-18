@@ -86,13 +86,6 @@ contract('TestPerpetual', accounts => {
         const positionAccount = await perpetual.getPosition(user);
         return positionAccount.side;
     }
-    const positionAverageEntryPrice = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
-        if (positionAccount.size == 0) {
-            return 0;
-        }
-        return positionAccount.entryValue * 1e18 / positionAccount.size;
-    }
     const positionEntryValue = async (user) => {
         const positionAccount = await perpetual.getPosition(user);
         return positionAccount.entryValue;
@@ -614,7 +607,6 @@ contract('TestPerpetual', accounts => {
             assert.equal(fromWad(await cashBalanceOf(u1)), 1000);
             assert.equal(await perpetual.totalAccounts(), 1);
             assert.equal(await perpetual.accountList(0), u1);
-            assert.equal(await perpetual.accountCreated(u1), true);
         });
 
         it('deposit && broker - 0', async () => {
