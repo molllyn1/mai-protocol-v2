@@ -47,7 +47,7 @@ contract('signature', accounts => {
             price: orderA.price,
             data: orderA.data,
             signature: orderA.signature,
-        }, {})
+        }) 
         console.log(ts.toString());
     });
 
