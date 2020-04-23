@@ -94,6 +94,33 @@ contract('TestPosition', accounts => {
         return (long == short) && (flat == "0")
     }
 
+    describe("exceptions", async () => {
+        beforeEach(async () => {
+            await deploy();
+            await setDefaultGovParameters();
+        });
+
+        it('addSocialLossPerContractPublic', async () => {
+            try {
+                await position.addSocialLossPerContractPublic(SHORT, toWad(-2.233));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("negtive social loss"), error);
+            }
+        });
+
+        it('trade', async () => {
+            await collateral.transfer(u1, toWad(10000));
+            await collateral.approve(position.address, infinity, {
+                from: u1
+            });
+            await position.depositPublic(toWad(10000), {
+                from: u1
+            });
+            await position.tradePublic(u1, LONG, toWad(7000), toWad(0));
+        });
+    })
+
     describe("miscs", async () => {
         beforeEach(async () => {
             await deploy();
@@ -736,9 +763,6 @@ contract('TestPosition', accounts => {
 
         });
 
-        return;
-
-
         it('buy', async () => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(position.address, infinity, {
@@ -881,9 +905,6 @@ contract('TestPosition', accounts => {
             assert.equal(fromWad(await position.totalSize(SHORT)), 1);
         });
     });
-
-
-    return;
 
     describe("pnl", async () => {
         beforeEach(async () => {

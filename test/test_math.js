@@ -15,6 +15,100 @@ contract('testMath', accounts => {
 
     before(deploy);
 
+    it("exceptions", async () => {
+        try {
+            await testSignedMath.mul(-1, "-57896044618658097711785492504343953926634992332820282019728792003956564819968");
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wmultiplication overflow"), error)
+        }
+
+        try {
+            await testSignedMath.div(-1, 0);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wdivision by zero"), error)
+        }
+        try {
+            await testSignedMath.div(-1, 0);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wdivision by zero"), error)
+        }
+        try {
+            await testSignedMath.div("-57896044618658097711785492504343953926634992332820282019728792003956564819968", -1);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wdivision overflow"), error)
+        }
+        try {
+            const c = await testSignedMath.sub("-57896044618658097711785492504343953926634992332820282019728792003956564819968", 1);
+            console.log(c.toString());
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("subtraction overflow"), error)
+        }
+        try {
+            await testSignedMath.add("57896044618658097711785492504343953926634992332820282019728792003956564819967", 1);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("addition overflow"), error)
+        }
+        try {
+            await testSignedMath.toUint256("-1");
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("int overflow"), error)
+        }
+        try {
+            await testSignedMath.wln("-1");
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("logE of negative number"), error)
+        }
+
+        try {
+            await testSignedMath.ceil(-1, 1);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("ceil need x >= "), error)
+        }
+        try {
+            await testSignedMath.ceil(1, -1);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("ceil need m > 0"), error)
+        }
+        /////
+        await testUnsignedMath.WAD();
+        try {
+            await testUnsignedMath.add("115792089237316195423570985008687907853269984665640564039457584007913129639935", 1);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("Unaddition overflow"), error)
+        }
+
+        await testUnsignedMath.div(0, 1);
+        try {
+            await testUnsignedMath.div(1, 0);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("Undivision by zero"), error)
+        }
+        try {
+            await testUnsignedMath.mod(1, 0);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("mod by zero"), error)
+        }
+        try {
+            await testUnsignedMath.ceil(1, 0);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("ceil need m > 0"), error)
+        }
+    });
+
     it("frac1", async () => {
         let r;
         let s;
@@ -36,6 +130,15 @@ contract('testMath', accounts => {
         let r;
         let s;
         r = await testSignedMath.wfrac("-1111111111111111111", "500000000000000000", "300000000000000000");
+        s = await testSignedMath.wmul("-1111111111111111111", "500000000000000000");
+        s = await testSignedMath.wdiv(s.toString(), "300000000000000000");
+        assert.ok(r.sub(s).abs() <= 1);
+    });
+
+    it("frac3 neg", async () => {
+        let r;
+        let s;
+        r = await testSignedMath.wfrac("1111111111111111111", "500000000000000000", "-300000000000000000");
         s = await testSignedMath.wmul("-1111111111111111111", "500000000000000000");
         s = await testSignedMath.wdiv(s.toString(), "300000000000000000");
         assert.ok(r.sub(s).abs() <= 1);
@@ -387,5 +490,14 @@ contract('testMath', accounts => {
 
         i = await testSignedMath.ceil('1000000000000000001', '1000000000000000000');
         assert.equal(i.toString(), '2000000000000000000');
+    });
+
+    it("max", async () => {
+        let i
+        i = await testUnsignedMath.max('1000000000000000001', '1000000000000000000');
+        assert.equal(i.toString(), '1000000000000000001');
+
+        i = await testUnsignedMath.max('0', '1000000000000000000');
+        assert.equal(i.toString(), '1000000000000000000');
     });
 });

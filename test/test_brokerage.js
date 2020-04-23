@@ -25,6 +25,24 @@ contract('TestBrokerage', accounts => {
 
     beforeEach(deploy);
 
+    it('exceptions', async () => {
+        try {
+            await brokerage.setBrokerPublic("0x0000000000000000000000000000000000000000", u2, 3);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("invalid trader"));
+        }
+
+        try {
+            await brokerage.setBrokerPublic(u1, "0x0000000000000000000000000000000000000000", 3);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("invalid guy"));
+        }
+    });
+
+
+
     it('new user => broker works immediately', async () => {
         await brokerage.assertBroker(u1, "0x0000000000000000000000000000000000000000");
         await brokerage.setBrokerPublic(u1, u2, 3); // u1 is a new user

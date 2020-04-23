@@ -66,6 +66,118 @@ contract('TestPerpGovernance', accounts => {
         await ammGovernance.setGovernanceParameter(toBytes32('fundingDampener'), toWad(0.0005));
     };
 
+    describe("exceptions", async () => {
+        before(deploy);
+
+        it("amm required", async () => {
+            try {
+                await governance.testAmmRequired();
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("no automated market maker"), error);
+            }
+        });
+
+        it("setGovernanceParameter exceptions", async () => {
+            try {
+                await governance.setGovernanceParameter(toBytes32("initialMarginRate"), 0);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require im > 0"), error);
+            }
+            try {
+                await governance.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(2));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require im < 1"), error);
+            }
+            try {
+                await governance.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.05));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require mm < im"), error);
+            }
+            try {
+                await governance.setGovernanceParameter(toBytes32("maintenanceMarginRate"), 0);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require mm > 0"), error);
+            }
+            try {
+                await governance.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.005));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require lpr < mm"), error);
+            }
+            await governance.setGovernanceParameter(toBytes32("penaltyFundRate"), toWad(0.006));
+            try {
+                await governance.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.006));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require pfr < mm"), error);
+            }
+            try {
+                await governance.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.05));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require lpr < mm"), error);
+            }
+            try {
+                await governance.setGovernanceParameter(toBytes32("penaltyFundRate"), toWad(0.05));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require pfr < mm"), error);
+            }
+            try {
+                await governance.setGovernanceParameter(toBytes32("lotSize"), toWad(1));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require tls % ls == 0"), error);
+            }
+
+            await governance.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(1));
+            await governance.setGovernanceParameter(toBytes32("lotSize"), toWad(1));
+
+            try {
+                await governance.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(0.5));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("require tls % ls == 0"), error);
+            }
+
+            try {
+                await governance.setGovernanceParameter(toBytes32("longSocialLossPerContracts"), toWad(0.5));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong perpetual status"), error);
+            }
+
+            try {
+                await governance.setGovernanceParameter(toBytes32("shortSocialLossPerContracts"), toWad(0.5));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong perpetual status"), error);
+            }
+        });
+
+        it("setGovernanceAddress exceptions", async () => {
+            try {
+                await governance.setGovernanceAddress(toBytes32("dev"), "0x0000000000000000000000000000000000000000");
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid address"), error);
+            }
+
+            try {
+                await governance.setGovernanceAddress(toBytes32("notexists"), "0x0000000000000000000000000000000000000001");
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("key not exists"), error);
+            }
+        });
+    });
+
+
     describe("global config", async () => {
         before(deploy);
 

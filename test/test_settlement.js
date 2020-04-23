@@ -191,6 +191,19 @@ contract('statement', accounts => {
         await perpetual.addWhitelisted(admin);
     });
 
+
+    it("setCashBalance", async () => {
+        await perpetual.deposit(toWad(7000), {from: u2});
+        await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+``
+        try {
+            await perpetual.setCashBalance(u2, toWad(1));
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"))
+        }
+    });
+
     it("set socialloss on settling", async () => {
         await perpetual.deposit(toWad(7000), {from: u2});
         await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});

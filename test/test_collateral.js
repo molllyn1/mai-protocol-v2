@@ -47,6 +47,66 @@ contract('TestCollateral', accounts => {
         return cashAccount.appliedBalance;
     }
 
+    describe("exceptions", async () => {
+        beforeEach(deploy);
+
+        it ("constructor - invalid decimals", async () => {
+            try {
+                const col = await TestCollateral.new("0x0000000000000000000000000000000000000000", 17);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid decimals"));
+            }
+        });
+
+        it ("constructor - decimals out of range", async () => {
+            try {
+                const col = await TestCollateral.new("0x0000000000000000000000000000000000000000", 19);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("decimals out of range"));
+            }
+        });
+
+        it('withdraw - negtive amount', async () => {
+            await collateral.transfer(u1, toWad(10));
+            await collateral.approve(vault.address, infinity, { from: u1 });
+            await vault.depositPublic(toWad(3.1415), { from: u1 });
+
+            await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
+            await increaseBlockBy(4);
+
+            await vault.withdrawPublic(0, { from: u1 });
+            assert.equal(await cashBalanceOf(u1), toWad(3.1415));
+
+            try {
+                await vault.withdrawPublic(toWad(-3.1415), { from: u1 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("uint256 overflow"), error);
+            }
+        });
+
+        it('withdraw - negtive amount', async () => {
+
+            await collateral.transfer(u1, toWad(10));
+            await collateral.approve(vault.address, infinity, { from: u1 });
+            await vault.depositPublic(toWad(3.1415), { from: u1 });
+
+            await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
+            await increaseBlockBy(4);
+
+            await vault.withdrawPublic(0, { from: u1 });
+            assert.equal(await cashBalanceOf(u1), toWad(3.1415));
+            try {
+                await vault.withdrawPublic(toWad(3.1416), { from: u1 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("insufficient balance"));
+            }
+        });
+    });
+
     describe("misc", async () => {
 
         beforeEach(deploy);
@@ -65,6 +125,23 @@ contract('TestCollateral', accounts => {
             assert.equal(account.appliedHeight, blockNumber);
         });
 
+        it ('depositToProtocol', async () => {
+            await collateral.transfer(u1, toWad(10));
+            await collateral.approve(vault.address, toWad(10), {from: u1});
+
+            await vault.depositToProtocolPublic(u1, toWad(0));
+            assert.equal(await collateral.balanceOf(vault.address), toWad(0));
+            await vault.withdrawFromProtocolPublic(u1, toWad(0));
+            assert.equal(await collateral.balanceOf(vault.address), toWad(0));
+            assert.equal(await collateral.balanceOf(u1), toWad(10));
+
+            await vault.depositToProtocolPublic(u1, toWad(9.9));
+            assert.equal(await collateral.balanceOf(vault.address), toWad(9.9));
+            await vault.withdrawFromProtocolPublic(u1, toWad(9.9));
+            assert.equal(await collateral.balanceOf(vault.address), toWad(0));
+            assert.equal(await collateral.balanceOf(u1), toWad(10));
+        });
+
     });
 
     describe("deposit / withdraw ether", async () => {
@@ -76,10 +153,14 @@ contract('TestCollateral', accounts => {
             let tx, gas;
             let b0 = await web3.eth.getBalance(u1);
 
+            tx = await vault.depositEtherPublic({ from: u1, value: 0, gasPrice: 20 * 10 ** 9 });
+            assert.equal(await cashBalanceOf(u1), 0);
+            gas = new BigNumber(20 * 10 ** 9).times(new BigNumber(tx.receipt.gasUsed));
+
             tx = await vault.depositEtherPublic({ from: u1, value: toWad(0.01), gasPrice: 20 * 10 ** 9 });
             assert.equal(await cashBalanceOf(u1), toWad(0.01));
+            gas = gas.plus(new BigNumber(20 * 10 ** 9).times(new BigNumber(tx.receipt.gasUsed)));
 
-            gas = new BigNumber(20 * 10 ** 9).times(new BigNumber(tx.receipt.gasUsed));
             let b1 = new BigNumber((await web3.eth.getBalance(u1)).toString());
             assert.equal(b1.plus(gas).plus(new BigNumber(toWad(0.01))).toFixed(), b0.toString());
 
@@ -200,10 +281,14 @@ contract('TestCollateral', accounts => {
             it('deposit', async () => {
                 await collateral.transfer(u1, toWad(10));
                 await collateral.approve(vault.address, infinity, { from: u1 });
+
+                await vault.depositPublic(0, { from: u1 });
+                assert.equal(await cashBalanceOf(u1), 0);
+
                 await vault.depositPublic(toWad(3.1415), { from: u1 });
+                assert.equal(await cashBalanceOf(u1), toWad(3.1415));
 
                 assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415));
             });
 
             it('deposit too much', async () => {

@@ -42,4 +42,40 @@ contract TestOrder {
     function isValidSignature(LibOrder.OrderParam memory orderParam, bytes32 orderHash) public pure returns (bool) {
         return orderParam.signature.isValidSignature(orderHash, orderParam.trader);
     }
+
+    function isSell(LibOrder.OrderParam memory orderParam) public pure returns (bool) {
+        return orderParam.isSell();
+    }
+
+    function getPrice(LibOrder.OrderParam memory orderParam) public pure returns (uint256) {
+        return orderParam.getPrice();
+    }
+
+    function isMarketOrder(LibOrder.OrderParam memory orderParam) public pure returns (bool) {
+        return orderParam.isMarketOrder();
+    }
+
+    function isMarketBuy(LibOrder.OrderParam memory orderParam) public pure returns (bool) {
+        return orderParam.isMarketBuy();
+    }
+
+    function isMakerOnly(LibOrder.OrderParam memory orderParam) public pure returns (bool) {
+        return orderParam.isMakerOnly();
+    }
+
+    function isInversed(LibOrder.OrderParam memory orderParam) public pure returns (bool) {
+        return orderParam.isInversed();
+    }
+
+    function side(LibOrder.OrderParam memory orderParam) public pure returns (LibTypes.Side) {
+        return orderParam.side();
+    }
+
+    function makerFeeRate(LibOrder.OrderParam memory orderParam) public pure returns (int256) {
+        return orderParam.makerFeeRate();
+    }
+
+    function takerFeeRate(LibOrder.OrderParam memory orderParam) public pure returns (int256) {
+        return orderParam.takerFeeRate();
+    }
 }

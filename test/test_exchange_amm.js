@@ -171,6 +171,118 @@ contract('exchange-amm', accounts => {
         await usePoolDefaultParamters();
     });
 
+    describe("exceptions", async () => {
+        beforeEach(async () => {
+            // index
+            await setIndexPrice(7000);
+            const indexPrice = await amm.indexPrice();
+            assert.equal(fromWad(indexPrice.price), 7000);
+
+            // approve
+            await collateral.transfer(u1, toWad(7000 * 21));
+            await collateral.transfer(u2, toWad(7000 * 3));
+            await collateral.transfer(dev, toWad(7000 * 3));
+            await collateral.approve(perpetual.address, infinity, {
+                from: u1
+            });
+            await collateral.approve(perpetual.address, infinity, {
+                from: u2
+            });
+            await collateral.approve(perpetual.address, infinity, {
+                from: dev
+            });
+
+            // create amm
+            await perpetual.deposit(toWad(7000 * 10 * 2.1), {
+                from: u1
+            });
+            await amm.createPool(toWad(10), {
+                from: u1
+            });
+
+            await setBroker(u1, admin);
+            await setBroker(u2, admin);
+            await amm.addWhitelisted(exchange.address);
+        });
+
+        it("taker order is maker only", async () => {
+            await perpetual.deposit(toWad('87.67676767676767677'), {
+                from: u2
+            });
+            const takerOrder = await buildOrder({
+                trader: u2,
+                amount: 0.1,
+                price: 10000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                makerOnly: true,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            try {
+                await exchange.matchOrderWithAMM(takerOrder, perpetual.address, toWad(0.1));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("taker order is maker only"));
+            }
+        });
+
+        it("invalid trading lot size", async () => {
+            await perpetual.deposit(toWad('87.67676767676767677'), {
+                from: u2
+            });
+            await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
+            const takerOrder = await buildOrder({
+                trader: u2,
+                amount: 0.1,
+                price: 10000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            try {
+                await exchange.matchOrderWithAMM(takerOrder, perpetual.address, toWad(0.1));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid trading lot size"));
+            }
+        });
+
+        it("taker overfilled", async () => {
+            await perpetual.deposit(toWad('87.67676767676767677'), {
+                from: u2
+            });
+            const takerOrder = await buildOrder({
+                trader: u2,
+                amount: 0.1,
+                price: 10000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            try {
+                await exchange.matchOrderWithAMM(takerOrder, perpetual.address, toWad(0.2));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("taker overfilled"));
+            }
+        });
+    });
+
     describe("trades", async () => {
 
         beforeEach(async () => {

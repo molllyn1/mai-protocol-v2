@@ -79,25 +79,25 @@ contract Perpetual is Brokerage, Position {
     }
 
     function depositFor(address guy, uint256 amount) public onlyWhitelisted {
-        require(isTokenizedCollateral(), "ether not acceptable");
+        require(isTokenizedCollateral(), "token not acceptable");
 
         depositToAccount(guy, amount);
     }
 
     function depositEtherFor(address guy) public payable onlyWhitelisted {
-        require(!isTokenizedCollateral(), "token not acceptable");
+        require(!isTokenizedCollateral(), "ether not acceptable");
 
         depositToAccount(guy, msg.value);
     }
 
     function deposit(uint256 amount) public {
-        require(isTokenizedCollateral(), "ether not acceptable");
+        require(isTokenizedCollateral(), "token not acceptable");
 
         depositToAccount(msg.sender, amount);
     }
 
     function depositEther() public payable {
-        require(!isTokenizedCollateral(), "token not acceptable");
+        require(!isTokenizedCollateral(), "ether not acceptable");
 
         depositToAccount(msg.sender, msg.value);
     }
@@ -178,7 +178,7 @@ contract Perpetual is Brokerage, Position {
     }
 
     function depositToInsuranceFund(uint256 rawAmount) public {
-        require(isTokenizedCollateral(), "ether not acceptable");
+        require(isTokenizedCollateral(), "token not acceptable");
         require(rawAmount > 0, "invalid amount");
 
         int256 wadAmount = depositToProtocol(msg.sender, rawAmount);
@@ -190,7 +190,7 @@ contract Perpetual is Brokerage, Position {
     }
 
     function depositEtherToInsuranceFund() public payable {
-        require(!isTokenizedCollateral(), "token not acceptable");
+        require(!isTokenizedCollateral(), "ether not acceptable");
         require(msg.value > 0, "invalid amount");
 
         int256 wadAmount = depositToProtocol(msg.sender, msg.value);
@@ -204,7 +204,7 @@ contract Perpetual is Brokerage, Position {
     function withdrawFromInsuranceFund(uint256 rawAmount) public onlyWhitelistAdmin {
         require(rawAmount > 0, "invalid amount");
         require(insuranceFundBalance > 0, "insufficient funds");
-        require(rawAmount.toInt256() <= insuranceFundBalance, "insufficient funds");
+        require(rawAmount <= insuranceFundBalance.toUint256(), "insufficient funds");
 
         int256 wadAmount = withdrawFromProtocol(msg.sender, rawAmount);
         insuranceFundBalance = insuranceFundBalance.sub(wadAmount);

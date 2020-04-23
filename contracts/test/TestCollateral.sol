@@ -38,4 +38,12 @@ contract TestCollateral is Collateral {
     function transferBalancePublic(address from, address to, uint256 amount) public {
         transferBalance(from, to, amount.toInt256());
     }
+
+    function depositToProtocolPublic(address guy, uint256 rawAmount) public returns (int256) {
+        return depositToProtocol(guy, rawAmount);
+    }
+
+    function withdrawFromProtocolPublic(address payable guy, uint256 rawAmount) public returns (int256) {
+        return withdrawFromProtocol(guy, rawAmount);
+    }
 }

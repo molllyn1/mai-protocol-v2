@@ -134,6 +134,660 @@ contract('exchange-user', accounts => {
         return cashAccount.balance;
     }
 
+    describe("exceptions", async () => {
+        it("wrong status", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            await perpetual.beginGlobalSettlement(toWad(6700));
+
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong perpetual status"));
+            }
+
+            await perpetual.endGlobalSettlement();
+
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong perpetual status"));
+            }
+        });
+
+        it("self trade", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("self trade"));
+            }
+        });
+
+        it("invalid side", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid side"));
+            }
+        });
+
+        it("market order cannot be maker", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("market order cannot be maker"));
+            }
+        });
+
+        it("taker overfilled", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(2) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("taker overfilled"), error);
+            }
+        });
+
+        it("maker overfilled", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(2) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("maker overfilled"), error);
+            }
+        });
+
+        it("invalid trading lot size", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid trading lot size"), error);
+            }
+        });
+
+        it("maker margin", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 580);
+            await funding.setMarkPrice(toWad(6000));
+            await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.01));
+            await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("maker margin"), error);
+            }
+        });
+
+        it("cancel order", async () => {
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.cancelOrder(takerParam, { from: u2 });
+                throw null;
+            } catch  (error) {
+                assert.ok(error.message.includes("invalid caller"), error);
+            }
+        });
+
+        it("taker margin", async () => {
+            await initialize(u1, 580);
+            await initialize(u2, 5800);
+            await funding.setMarkPrice(toWad(6000));
+            await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0));
+            await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0.01));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("taker margin"), error);
+            }
+        });
+
+        it("dev safe", async () => {
+            await initialize(u1, 660);
+            await initialize(u2, 5800);
+            await funding.setMarkPrice(toWad(6000));
+            await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.01));
+            await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(-0.01));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                salt: 666,
+            }, perpetual.address, admin);
+            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+        });
+
+        it("no dev", async () => {
+            await initialize(u1, 650);
+            await initialize(u2, 5800);
+            await funding.setMarkPrice(toWad(6000));
+            await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.00));
+            await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0.00));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                salt: 666,
+            }, perpetual.address, admin);
+            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+        });
+
+        it("dev unsafe", async () => {
+            await initialize(u1, 580);
+            await initialize(u2, 5800);
+            await funding.setMarkPrice(toWad(6000));
+            await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(-0.01));
+            await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(-0.01));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("dev unsafe"), error);
+            }
+        });
+
+        it("maker unsafe", async () => {
+            await initialize(u1, 5800);
+            await initialize(u2, 700);
+            await funding.setMarkPrice(toWad(6000));
+            await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.01));
+            await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0));
+
+            let takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            let makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+
+            await funding.setMarkPrice(toWad(16000));
+            takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(0.1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("maker unsafe"), error);
+            }
+        });
+
+        it("taker unsafe", async () => {
+            await initialize(u1, 700);
+            await initialize(u2, 5800);
+            await funding.setMarkPrice(toWad(6000));
+            await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0));
+            await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0.01));
+
+            let takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            let makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+
+            await funding.setMarkPrice(toWad(16000));
+            takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 3000,
+                version: 2,
+                side: 'buy',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 3000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            try {
+                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(0.1) ]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("maker unsafe"), error);
+            }
+        });
+
+        it("market order", async () => {
+            await initialize(u1, 10000);
+            await initialize(u2, 10000);
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 2,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'market',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+        });
+    });
+
     it("trade", async () => {
         await collateral.transfer(u1, toWad(10000));
         await collateral.approve(perpetual.address, infinity, {
@@ -247,12 +901,8 @@ contract('exchange-user', accounts => {
     });
 
     it("soft fee - hit floor", async () => {
-
-
         await initialize(u1, 660);
         await initialize(u2, 720);
-
-
         await funding.setMarkPrice(toWad(6000));
 
         await exchange.matchOrders(
@@ -622,6 +1272,58 @@ contract('exchange-user', accounts => {
             throw null;
         } catch (error) {
             assert.ok(error.message.includes("price not match"), error);
+        }
+    });
+
+     it("maker only", async () => {
+        await initialize(u1, 10000);
+        await initialize(u2, 10000);
+        await funding.setMarkPrice(toWad(6000));
+
+        try {
+            await exchange.matchOrders(
+                await buildOrder({
+                        trader: u1,
+                        amount: 1,
+                        price: 6000,
+                        version: 2,
+                        side: 'sell',
+                        type: 'limit',
+                        expiredAtSeconds: 86400,
+                        makerFeeRate: 1000,
+                        takerFeeRate: 1000,
+                        salt: 666,
+                        makerOnly: true,
+                    },
+                    perpetual.address,
+                    admin
+                ),
+                [
+                    await buildOrder({
+                            trader: u2,
+                            amount: 1,
+                            price: 5800,
+                            version: 2,
+                            side: 'buy',
+                            type: 'limit',
+                            expiredAtSeconds: 86400,
+                            makerFeeRate: 1000,
+                            takerFeeRate: 1000,
+                            salt: 666,
+                            makerOnly: true,
+                        },
+                        perpetual.address,
+                        admin
+                    )
+                ],
+                perpetual.address,
+                [
+                    toWad(1)
+                ]
+            );
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("taker order is maker only"), error);
         }
     });
 

@@ -153,6 +153,7 @@ contract('amm-eth', accounts => {
         });
 
         it("depositAndBuy - success", async () => {
+            await amm.depositEtherAndBuy(toWad(0), toWad('10000'), infinity, { value: toWad(0), from: u2 });
             await amm.depositEtherAndBuy(toWad(1), toWad('10000'), infinity, { value: toWad(7000 * 1), from: u2 });
 
             assert.equal(fromWad(await amm.positionSize()), 9);
@@ -187,6 +188,7 @@ contract('amm-eth', accounts => {
         });
 
         it("depositAndSell - success", async () => {
+            await amm.depositEtherAndSell(toWad(0), toWad(0), infinity, { value: toWad(0), from: u2 });
             await amm.depositEtherAndSell(toWad(1), toWad(0), infinity, { value: toWad(2000), from: u2 });
 
             assert.equal(fromWad(await amm.positionSize()), 11);
@@ -209,6 +211,7 @@ contract('amm-eth', accounts => {
         });
 
         it("depositAndAddLiquidity - success", async () => {
+            await amm.depositEtherAndAddLiquidity(toWad(0), { value: toWad(0), from: u2 });
             await amm.depositEtherAndAddLiquidity(toWad(1), { value: toWad(7000 * 3), from: u2 });
 
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000);

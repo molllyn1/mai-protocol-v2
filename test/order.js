@@ -152,7 +152,7 @@ const buildOrder = async (orderParam, perpetual, broker) => {
             orderParam.makerFeeRate || 0,
             orderParam.takerFeeRate || 0,
             orderParam.salt || 10000000,
-            false,
+            orderParam.makerOnly || false,
             orderParam.inversed || false,
         ),
     };

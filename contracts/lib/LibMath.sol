@@ -95,12 +95,6 @@ library LibMathSigned {
         return x >= y ? x : y;
     }
 
-    // quotient and remainder
-    function pwdiv(int256 x, int256 y) internal pure returns (int256 z, int256 m) {
-        z = wdiv(x, y);
-        m = sub(wmul(y, z), x);
-    }
-
     function toUint256(int256 x) internal pure returns (uint256) {
         require(x >= 0, "int overflow");
         return uint256(x);
@@ -294,12 +288,6 @@ library LibMathUnsigned {
 
     function max(uint256 x, uint256 y) internal pure returns (uint256 z) {
         return x >= y ? x : y;
-    }
-
-    // quotient and remainder
-    function pwdiv(uint256 x, uint256 y) internal pure returns (uint256 z, uint256 m) {
-        z = wdiv(x, y);
-        m = sub(wmul(y, z), x);
     }
 
     function toInt256(uint256 x) internal pure returns (int256) {
