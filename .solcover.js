@@ -4,7 +4,9 @@ module.exports = {
     skipFiles: [
         'interface',
         'test',
-        'test/*.sol'
+        'test/*.sol',
+        'oracle/ChainlinkAdapter.sol',
+        'oracle/InversedChainlinkAdapter.sol'
     ],
     copyPackages: [
         '@openzeppelin/contracts'
