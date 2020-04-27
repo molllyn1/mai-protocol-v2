@@ -149,11 +149,11 @@ contract Collateral {
         emit Transfer(from, to, wadAmount, cashBalances[from].balance, cashBalances[to].balance);
     }
 
-    function toWad(uint256 rawAmount) private view returns (int256) {
+    function toWad(uint256 rawAmount) internal view returns (int256) {
         return rawAmount.toInt256().mul(scaler);
     }
 
-    function toCollateral(int256 wadAmount) private view returns (uint256) {
+    function toCollateral(int256 wadAmount) internal view returns (uint256) {
         return wadAmount.div(scaler).toUint256();
     }
 }

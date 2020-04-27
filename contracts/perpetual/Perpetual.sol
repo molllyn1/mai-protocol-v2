@@ -206,8 +206,9 @@ contract Perpetual is Brokerage, Position {
         require(insuranceFundBalance > 0, "insufficient funds");
         require(rawAmount <= insuranceFundBalance.toUint256(), "insufficient funds");
 
-        int256 wadAmount = withdrawFromProtocol(msg.sender, rawAmount);
+        int256 wadAmount = toWad(rawAmount);
         insuranceFundBalance = insuranceFundBalance.sub(wadAmount);
+        withdrawFromProtocol(msg.sender, rawAmount);
 
         require(insuranceFundBalance >= 0, "negtive insurance fund");
 
