@@ -25,3 +25,24 @@ Check the wiki to get more design details.
 
 * [Margin Account: The perpetual account model](https://github.com/mcdexio/mai-protocol-v2/wiki/Margin-Account)
 * [Admin Functions: What can the admin do](https://github.com/mcdexio/mai-protocol-v2/wiki/Admin-Functions)
+
+## Contracts
+
+### Mainnet
+
+|Contract|Description|Address|
+|---|---|---|
+|[`Perpetual`](contracts/perpetual/Perpetual.sol)               |Perpetual core logic including margin account, PnL, etc.|[0x92c506D3dd51A37650Cc8e352a7551c26E2c607d](https://etherscan.io/address/0x92c506D3dd51A37650Cc8e352a7551c26E2c607d)|
+|[`AMM`](contracts/liquidity/AMM.sol)                           |Automated Market Maker                                  |[0xF4CE6d5E9Cdcd6c91e303B87E27688f01B9Bb7bf](https://etherscan.io/address/0xF4CE6d5E9Cdcd6c91e303B87E27688f01B9Bb7bf)|
+|[`Proxy`](contracts/proxy/PerpetualProxy.sol)                  |AMM margin account                                      |[0xDA9f6FB1ef188E081CFBeA74ec820A3718E91f21](https://etherscan.io/address/0xDA9f6FB1ef188E081CFBeA74ec820A3718E91f21)|
+|[`GlobalConfig`](contracts/global/GlobalConfig.sol)            |Common governance parameters                            |[0x77C073a91B53B35382C7C4cdF4079b7E312d552d](https://etherscan.io/address/0x77C073a91B53B35382C7C4cdF4079b7E312d552d)|
+|[`Exchange`](contracts/exchange/Exchange.sol)                  |Orderbook exchange logic                                |[0xb95B9fb0539Ec84DeD2855Ed1C9C686Af9A4e8b3](https://etherscan.io/address/0xb95B9fb0539Ec84DeD2855Ed1C9C686Af9A4e8b3)|
+|[`PriceFeeder`](contracts/oracle/InversedChainlinkAdapter.sol) |Price oracle                                            |[0x133906776302D10A2005ec2eD0C92ab6F2cbd903](https://etherscan.io/address/0x133906776302D10A2005ec2eD0C92ab6F2cbd903)|
+|[`ShareToken`](contracts/token/ShareToken.sol)                 |Share token of the AMM                                  |[0x6d5B330523017E2D4EC36ff973a49A440aB763EF](https://etherscan.io/address/0x6d5B330523017E2D4EC36ff973a49A440aB763EF)|
+|[`ContractReader`](contracts/reader/ContractReader.sol)        |A batch reader in order to reduce calling consumption   |[0xEd1051ef1BFaFA9358341517598D225d852C7796](https://etherscan.io/address/0xEd1051ef1BFaFA9358341517598D225d852C7796)|
+  
+
+  
+
+
+
