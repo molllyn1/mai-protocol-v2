@@ -21,10 +21,7 @@ The name Mai comes from two Chinese characters "买" which means buy and "卖" w
 
 ## Design Details
 
-Check the wiki to get more design details.
-
-* [Margin Account: The perpetual account model](https://github.com/mcdexio/mai-protocol-v2/wiki/Margin-Account)
-* [Admin Functions: What can the admin do](https://github.com/mcdexio/mai-protocol-v2/wiki/Admin-Functions)
+Check our [documents](https://github.com/mcdexio/documents) to get more information.
 
 ## Contracts
 
