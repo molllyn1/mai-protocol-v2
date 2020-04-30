@@ -16,8 +16,8 @@ The name Mai comes from two Chinese characters "买" which means buy and "卖" w
 - Validate the users' orders and execute the match result of order book
 - Liquidation of the unsafe position
 - Insurance fund
-- Socialize the the liquidation loss
-- Global settlement when an emergency to keep the users’ assets safe
+- Socialize the liquidation loss
+- Global settlement when an emergency to keep the users' assets safe
 
 ## Design Details
 
