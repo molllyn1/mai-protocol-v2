@@ -274,8 +274,6 @@ contract('amm', accounts => {
         });
     });
 
-    return;
-
     describe("availableMargin", async () => {
         beforeEach(async () => {
             await amm.setGovernanceParameter(toBytes32("poolFeeRate"), toWad(0));
