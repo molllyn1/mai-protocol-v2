@@ -61,7 +61,7 @@ function createEVMSnapshot() {
     });
 }
 
-function restoreEVMSnapshotsnapshotId(snapshotId) {
+function restoreEVMSnapshot(snapshotId) {
     const id = Date.now() + Math.floor(Math.random() * 100000000);
     return new Promise((resolve, reject) => {
         web3.currentProvider.send({
@@ -247,7 +247,7 @@ module.exports = {
     send,
     initializeToken,
     createEVMSnapshot,
-    restoreEVMSnapshotsnapshotId,
+    restoreEVMSnapshot,
     increaseEvmTime,
     increaseEvmBlock,
     stopMiner,

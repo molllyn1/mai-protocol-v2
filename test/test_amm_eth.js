@@ -1,6 +1,6 @@
 const assert = require('assert');
 const BigNumber = require('bignumber.js');
-const { increaseEvmBlock, increaseEvmTime, createEVMSnapshot, restoreEVMSnapshotsnapshotId, toBytes32, assertApproximate } = require('./funcs');
+const { increaseEvmBlock, increaseEvmTime, createEVMSnapshot, restoreEVMSnapshot, toBytes32, assertApproximate } = require('./funcs');
 const { toWei, fromWei, toWad, fromWad, infinity, Side } = require('./constants');
 const { inspect, printFunding } = require('./funcs')
 
@@ -72,7 +72,7 @@ contract('amm-eth', accounts => {
         await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
     };
 
-    const useDefaulGovParamters = async () => {
+    const useDefaultGovParameters = async () => {
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
         await perpetual.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.005));
@@ -83,7 +83,7 @@ contract('amm-eth', accounts => {
         await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), 1);
     };
 
-    const usePoolDefaultParamters = async () => {
+    const usePoolDefaultParameters = async () => {
         await amm.setGovernanceParameter(toBytes32("poolFeeRate"), toWad(0.01));
         await amm.setGovernanceParameter(toBytes32("poolDevFeeRate"), toWad(0.005));
         await amm.setGovernanceParameter(toBytes32("updatePremiumPrize"), toWad(1));
@@ -131,13 +131,13 @@ contract('amm-eth', accounts => {
         snapshotId = await createEVMSnapshot();
         await deploy();
         await useDefaultGlobalConfig();
-        await useDefaulGovParamters();
-        await usePoolDefaultParamters();
+        await useDefaultGovParameters();
+        await usePoolDefaultParameters();
         await setBroker(u1, proxy.address);
     });
 
     afterEach(async function () {
-        await restoreEVMSnapshotsnapshotId(snapshotId);
+        await restoreEVMSnapshot(snapshotId);
     });
 
     describe("composite helper", async () => {

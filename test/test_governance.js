@@ -37,8 +37,8 @@ contract('TestPerpGovernance', accounts => {
         globalConfig = await GlobalConfig.new();
 
         await useDefaultGlobalConfig();
-        await useDefaulGovParamters();
-        await usePoolDefaultParamters();
+        await useDefaultGovParameters();
+        await usePoolDefaultParameters();
     };
 
     const useDefaultGlobalConfig = async () => {
@@ -46,7 +46,7 @@ contract('TestPerpGovernance', accounts => {
         await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
     };
 
-    const useDefaulGovParamters = async () => {
+    const useDefaultGovParameters = async () => {
         await governance.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await governance.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
         await governance.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.005));
@@ -57,7 +57,7 @@ contract('TestPerpGovernance', accounts => {
         await governance.setGovernanceParameter(toBytes32("tradingLotSize"), 1);
     };
 
-    const usePoolDefaultParamters = async () => {
+    const usePoolDefaultParameters = async () => {
         await ammGovernance.setGovernanceParameter(toBytes32("poolFeeRate"), toWad(0.000375));
         await ammGovernance.setGovernanceParameter(toBytes32("poolDevFeeRate"), toWad(0.000375));
         await ammGovernance.setGovernanceParameter(toBytes32("updatePremiumPrize"), toWad(0));

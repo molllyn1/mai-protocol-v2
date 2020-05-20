@@ -417,7 +417,7 @@ contract('TestPerpetual', accounts => {
 
             await perpetual.tradePosition(u1, SHORT, priceAfter.toFixed(), amount.toFixed()); // 1.11..
             // value = 864197530864197532335
-            // acturally:
+            // actually:
             //   7777.777777777777777778 * 1.111111111111111113 - 7777.777777777777777777 * 1.111111111111111113
             //     = 1.111111E-18 ~= 1E-18
             const availableAfter = new BigNumber((await perpetual.availableMargin.call(u1)).toString());
@@ -918,7 +918,7 @@ contract('TestPerpetual', accounts => {
         });
     });
 
-    describe("miscs", async () => {
+    describe("misc", async () => {
         beforeEach(deploy);
 
         it("transfer balance", async () => {
