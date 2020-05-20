@@ -99,6 +99,36 @@ contract('signature', accounts => {
         assert(false, 'Should never get here');
     });
 
+    it('hack 1', async () => {
+        const sha = toBuffer(orderHash);
+        const sig = ecsign(sha, toBuffer(privateKey));
+        sig.v -= 0x1b;
+
+        try {
+            const isValid = await testSignature.isValidSignature(formatSig(sig, SignatureType.EthSign), orderHash, address);
+        } catch (e) {
+            assert.ok(e.message.includes('ECDSA'), e);
+            return;
+        }
+
+        assert(false, 'Should never get here');
+    });
+
+    it('hack 2', async () => {
+        const sha = toBuffer(orderHash);
+        const sig = ecsign(sha, toBuffer(privateKey));
+        sig.s[0] += 0x80;
+
+        try {
+            const isValid = await testSignature.isValidSignature(formatSig(sig, SignatureType.EthSign), orderHash, address);
+        } catch (e) {
+            assert.ok(e.message.includes('ECDSA'), e);
+            return;
+        }
+
+        assert(false, 'Should never get here');
+    });
+
     it("isValidSignature", async () => {
         orderHash = "0x605d1580332d740045eb5ec8334a0d15801859c5be0ea455facdb54e73ac21c1"
         trader = u1
@@ -132,6 +162,7 @@ contract('signature', accounts => {
 
     it("isValidSignature invalid", async () => {
         const trader = u1
+        const trader2 = u2
         const perpetualAddress = "0x4DA467821456Ca82De42fa691ddA08B24A4f0572";
         const orderA = await buildOrder({
             trader: trader,
@@ -143,13 +174,11 @@ contract('signature', accounts => {
             expiredAt: 1589366656,
             salt: 666,
         }, perpetualAddress, admin);
-
         orderHash = getOrderHash(orderA)
 
         let signature = fromRpcSig(await web3.eth.sign(orderHash, trader));
         signature.config = `0x${signature.v.toString(16)}00` + '0'.repeat(60);
-        signature.config = '0x2c00000000000000000000000000000000000000000000000000000000000000'
-        const isValid = await testSignature.isValidSignature(signature, orderHash, trader)
+        const isValid = await testSignature.isValidSignature(signature, orderHash, trader2)
         assert.ok(!isValid);
     });
 
@@ -172,7 +201,6 @@ contract('signature', accounts => {
             data: orderA.data,
             signature: orderA.signature,
         }, { from: admin })
-        console.log(ts.toString());
     });
 
     it("generate signature", async () => {
