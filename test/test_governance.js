@@ -6,6 +6,7 @@ const { toWad, fromWad, infinity } = require('./constants');
 const TestPerpGovernance = artifacts.require('test/TestPerpGovernance.sol');
 const AMMGovernance = artifacts.require('liquidity/AMMGovernance.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 
 contract('TestPerpGovernance', accounts => {
     const NORMAL = 0;
@@ -297,6 +298,24 @@ contract('TestPerpGovernance', accounts => {
             assert.equal((await ammGovernance.getGovernance()).fundingDampener, '500000000000000');
             await ammGovernance.setGovernanceParameter(toBytes32("fundingDampener"), toWad(0.2));
             assert.equal((await ammGovernance.getGovernance()).fundingDampener, toWad(0.2));
+
+            assert.equal(await ammGovernance.priceFeeder(), "0x0000000000000000000000000000000000000000");
+            const priceFeeder = await PriceFeeder.new();
+            await ammGovernance.setGovernanceParameter(toBytes32("priceFeeder"), priceFeeder.address);
+            assert.equal(await ammGovernance.priceFeeder(), priceFeeder.address);
+            try {
+                await ammGovernance.setGovernanceParameter(toBytes32("priceFeeder"), "0x0000000000000000000000000000000000000000");
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong address"), error);
+            }
+            try {
+                await ammGovernance.setGovernanceParameter(toBytes32("priceFeeder"), admin);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong address"), error);
+            }
+            
         });
 
         it('key not exists', async () => {
@@ -318,7 +337,6 @@ contract('TestPerpGovernance', accounts => {
         const status = await governance.status();
         return status == SETTLED
     }
-
 
     describe("status", async () => {
         beforeEach(deploy);

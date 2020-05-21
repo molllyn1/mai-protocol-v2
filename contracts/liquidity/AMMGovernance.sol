@@ -2,6 +2,7 @@ pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "@openzeppelin/contracts/access/roles/WhitelistedRole.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
@@ -45,6 +46,9 @@ contract AMMGovernance is WhitelistedRole {
         } else if (key == "accumulatedFundingPerContract") {
             require(perpetualProxy.status() == LibTypes.Status.SETTLING, "wrong perpetual status");
             fundingState.accumulatedFundingPerContract = value;
+        } else if (key == "priceFeeder") {
+            require(Address.isContract(address(value)), "wrong address");
+            priceFeeder = IPriceFeeder(value);
         } else {
             revert("key not exists");
         }
