@@ -3,6 +3,7 @@ const BigNumber = require('bignumber.js');
 const TestSignedMath = artifacts.require('TestSignedMath');
 const TestUnsignedMath = artifacts.require('TestUnsignedMath');
 const { toWei, fromWei, toWad, fromWad, infinity, Side } = require('./constants');
+const { assertApproximate } = require('./funcs');
 
 contract('testMath', accounts => {
 
@@ -333,117 +334,75 @@ contract('testMath', accounts => {
         let i;
 
         // 0.987... ^ 0 = 1
-        i = await testSignedMath.wpowi('987654321012345678', 0);
-        err = new BigNumber(i).minus('1000000000000000000').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 0)), '1.000000000000000000', '1e-16');
 
         // 0.987... ^ 1 = 0.9
-        i = await testSignedMath.wpowi('987654321012345678', 1);
-        err = new BigNumber(i).minus('987654321012345678').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 1)), '0.987654321012345678', '1e-16');
 
         // 0.987... ^ 2 = 0.9
-        i = await testSignedMath.wpowi('987654321012345678', 2);
-        err = new BigNumber(i).minus('975461057814357565').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 2)), '0.975461057814357565', '1e-16');
 
         // 0.987... ^ 3 = 0.9
-        i = await testSignedMath.wpowi('987654321012345678', 3);
-        err = new BigNumber(i).minus('963418328729623793').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 3)), '0.963418328729623793', '1e-16');
 
         // 0.987... ^ 30 = 0.6
-        i = await testSignedMath.wpowi('987654321012345678', 30);
-        err = new BigNumber(i).minus('688888672631861173').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 30)), '0.688888672631861173', '1e-16');
 
         // 0.987... ^ 31 = 0.6
-        i = await testSignedMath.wpowi('987654321012345678', 31);
-        err = new BigNumber(i).minus('680383874221316927').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 31)), '0.680383874221316927', '1e-16');
 
         // 0.987... ^ 300 = 0.02
-        i = await testSignedMath.wpowi('987654321012345678', 300);
-        err = new BigNumber(i).minus('24070795168472815').abs();
-        assert.ok(err.lt('10000'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 300)), '0.024070795168472815', '1e-14');
 
         // 0.987... ^ 301 = 0.02
-        i = await testSignedMath.wpowi('987654321012345678', 301);
-        err = new BigNumber(i).minus('23773624858345269').abs();
-        assert.ok(err.lt('10000'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('987654321012345678', 301)), '0.023773624858345269', '1e-14');
 
         // 0.9999999 ^ 100000 = 0.99
-        i = await testSignedMath.wpowi('999999900000000000', 100000);
-        err = new BigNumber(i).minus('990049833254143103').abs();
-        assert.ok(err.lt('10000'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('999999900000000000', 100000)), '0.990049833254143103', '1e-14');
 
         // 0.9999999 ^ 100001 = 0.99
-        i = await testSignedMath.wpowi('999999900000000000', 100001);
-        err = new BigNumber(i).minus('990049734249159778').abs();
-        assert.ok(err.lt('10000'));
+        assertApproximate(assert, fromWad(await testSignedMath.wpowi('999999900000000000', 100001)), '0.990049734249159778', '1e-14');
     });
 
     it("log", async () => {
         let i, err;
 
         // Ln(1.9) = 0.68
-        i = await testSignedMath.wln('1975308642024691356');
-        err = new BigNumber(i).minus('680724660586388155').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('1975308642024691356')), '0.680724660586388155', '1e-18');
 
         // Ln(0.9) = -0.01
-        i = await testSignedMath.wln('987654321012345678');
-        err = new BigNumber(i).minus('-12422519973557154').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('987654321012345678')), '-0.012422519973557154', '1e-18');
 
         // Ln(1) = 0
         i = await testSignedMath.wln('1000000000000000000');
         assert.equal(i.toString(), '0');
 
         // Ln(1 + 1e-18) = 1e-18
-        i = await testSignedMath.wln('1000000000000000001');
-        err = new BigNumber(i).minus('1').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('1000000000000000001')), '0.000000000000000001', '1e-18');
 
         // Ln(0.1) = -2.3
-        i = await testSignedMath.wln('100000000000000000');
-        err = new BigNumber(i).minus('-2302585092994045684').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('100000000000000000')), '-2.302585092994045684', '1e-18');
 
         // Ln(0.5) = -0.6
-        i = await testSignedMath.wln('500000000000000000');
-        err = new BigNumber(i).minus('-693147180559945309').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('500000000000000000')), '-0.693147180559945309', '1e-18');
 
         // Ln(3) = 1.0
-        i = await testSignedMath.wln('3000000000000000000');
-        err = new BigNumber(i).minus('1098612288668109691').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('3000000000000000000')), '1.098612288668109691', '1e-18');
 
         // Ln(10) = 2.3
-        i = await testSignedMath.wln('10000000000000000000');
-        err = new BigNumber(i).minus('2302585092994045684').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('10000000000000000000')), '2.302585092994045684', '1e-18');
 
         // Ln(1.2345) = 0.2
-        i = await testSignedMath.wln('1234500000000000000');
-        err = new BigNumber(i).minus('210666029803097142').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('1234500000000000000')), '0.210666029803097142', '1e-18');
 
         // Ln(e) = 1
-        i = await testSignedMath.wln('2718281828459045235');
-        err = new BigNumber(i).minus('1000000000000000000').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('2718281828459045235')), '1', '1e-18');
 
         // Ln(e - 1e-18) = 0.9
-        i = await testSignedMath.wln('2718281828459045234');
-        err = new BigNumber(i).minus('999999999999999999').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('2718281828459045234')), '0.999999999999999999', '1e-18');
 
         // Ln(1e22) = 50.6
-        i = await testSignedMath.wln('10000000000000000000000000000000000000000');
-        err = new BigNumber(i).minus('50656872045869005048').abs();
-        assert.ok(err.lte('1'));
+        assertApproximate(assert, fromWad(await testSignedMath.wln('10000000000000000000000000000000000000000')), '50.656872045869005048', '1e-18');
 
         // Ln(1e22 + 1) = err
         try {
@@ -452,25 +411,26 @@ contract('testMath', accounts => {
         } catch (error) {
             assert.ok(error.message.includes("only accepts"), error);
         }
+
+        // Ln(1e-18) = -41
+        assertApproximate(assert, fromWad(await testSignedMath.wln('1')), '-41.446531673892822312', '1e-18');
+
+        // Ln(2e-18) = -40
+        assertApproximate(assert, fromWad(await testSignedMath.wln('2')), '-40.753384493332877002', '1e-18');
+
+        // Ln(11e-18) = -39
+        assertApproximate(assert, fromWad(await testSignedMath.wln('11')), '-39.048636401094451768', '1e-18');
     });
 
     it("logBase", async () => {
-        let i, err;
-
         // Ln(0.9, 1.9)
-        i = await testSignedMath.logBase('900000000000000000', '1900000000000000000');
-        err = new BigNumber(i).minus('-6091977456307344157').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.logBase('900000000000000000', '1900000000000000000')), '-6.091977456307344157', '1e-16');
 
         // Ln(1.9, 0.9)
-        i = await testSignedMath.logBase('1900000000000000000', '900000000000000000');
-        err = new BigNumber(i).minus('-164150311975407507').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.logBase('1900000000000000000', '900000000000000000')), '-0.164150311975407507', '1e-16');
 
         // Ln(1.9, 2.9)
-        i = await testSignedMath.logBase('1900000000000000000', '2900000000000000000');
-        err = new BigNumber(i).minus('1658805469484154444').abs();
-        assert.ok(err.lt('100'));
+        assertApproximate(assert, fromWad(await testSignedMath.logBase('1900000000000000000', '2900000000000000000')), '1.658805469484154444', '1e-16');
     });
 
     it("ceil", async () => {
