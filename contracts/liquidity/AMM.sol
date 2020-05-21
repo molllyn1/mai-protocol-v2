@@ -16,13 +16,7 @@ contract AMM is AMMGovernance {
 
     int256 private constant FUNDING_PERIOD = 28800; // 8 * 3600;
 
-    // interfaces
     ShareToken private shareToken;
-    IPriceFeeder public priceFeeder;
-    IPerpetual public perpetualProxy;
-
-    // funding
-    LibTypes.FundingState internal fundingState;
 
     event CreateAMM();
     event UpdateFundingRate(LibTypes.FundingState fundingState);

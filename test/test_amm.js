@@ -1245,6 +1245,10 @@ contract('amm', accounts => {
             assertApproximate(assert, fromWad(await amm.currentAccumulatedFundingPerContract.call()), '0');
             assertApproximate(assert, fromWad(await perpetual.pnl.call(u2)), '-0.700700700700700701');
 
+            await amm.setGovernanceParameter(toBytes32("accumulatedFundingPerContract"), toWad(-0.1));
+            assertApproximate(assert, fromWad(await amm.currentAccumulatedFundingPerContract.call()), '-0.1');
+            assertApproximate(assert, fromWad(await perpetual.pnl.call(u2)), '-0.690700700700700701');
+
             // await inspect(u2);
             // await printFunding();
         });

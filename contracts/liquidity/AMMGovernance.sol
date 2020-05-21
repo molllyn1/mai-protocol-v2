@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/access/roles/WhitelistedRole.sol";
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
+import "../interface/IPriceFeeder.sol";
+import "../interface/IPerpetualProxy.sol";
 
 
 contract AMMGovernance is WhitelistedRole {
@@ -12,10 +14,14 @@ contract AMMGovernance is WhitelistedRole {
     using LibMathUnsigned for uint256;
 
     LibTypes.AMMGovernanceConfig internal governance;
+    LibTypes.FundingState internal fundingState;
 
     // auto-set when calling setGovernanceParameter
     int256 public emaAlpha2; // 1 - emaAlpha
     int256 public emaAlpha2Ln; // ln(emaAlpha2)
+
+    IPerpetualProxy public perpetualProxy;
+    IPriceFeeder public priceFeeder;
 
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
 
@@ -36,6 +42,9 @@ contract AMMGovernance is WhitelistedRole {
             governance.markPremiumLimit = value;
         } else if (key == "fundingDampener") {
             governance.fundingDampener = value;
+        } else if (key == "accumulatedFundingPerContract") {
+            require(perpetualProxy.status() == LibTypes.Status.SETTLING, "wrong perpetual status");
+            fundingState.accumulatedFundingPerContract = value;
         } else {
             revert("key not exists");
         }
