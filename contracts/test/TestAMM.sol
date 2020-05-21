@@ -32,6 +32,10 @@ contract TestAMM is AMM {
         mockBlockTimestamp = newValue;
     }
 
+    function fundingPublic() public {
+        funding();
+    }
+
     function timeOnFundingCurvePublic(
         int256 y,
         int256 v0, // lastEMAPremium

@@ -144,7 +144,6 @@ contract('amm', accounts => {
         await restoreEVMSnapshot(snapshotId);
     });
 
-
     describe("exceptions", async () => {
         it("indexPrice", async () => {
             await priceFeeder.setPrice(0);
@@ -909,8 +908,6 @@ contract('amm', accounts => {
         });
     });
 
-    // TODO: funding freeze after settling
-
     describe("funding", async () => {
         beforeEach(async () => {
             // index
@@ -1025,13 +1022,13 @@ contract('amm', accounts => {
 
         it("consumed gas", async () => {
             await amm.setBlockTimestamp((await amm.mockBlockTimestamp()).toNumber() + 15);
-            console.log("estimateGas 15s:", await amm.funding.estimateGas());
+            console.log("estimateGas 15s:", await amm.fundingPublic.estimateGas());
             await amm.setBlockTimestamp((await amm.mockBlockTimestamp()).toNumber() + 600);
-            console.log("estimateGas 10m:", await amm.funding.estimateGas());
+            console.log("estimateGas 10m:", await amm.fundingPublic.estimateGas());
             await amm.setBlockTimestamp((await amm.mockBlockTimestamp()).toNumber() + 86400);
-            console.log("estimateGas 1d:", await amm.funding.estimateGas());
+            console.log("estimateGas 1d:", await amm.fundingPublic.estimateGas());
             await amm.setBlockTimestamp((await amm.mockBlockTimestamp()).toNumber() + 86400 * 365);
-            console.log("estimateGas 1y:", await amm.funding.estimateGas());
+            console.log("estimateGas 1y:", await amm.fundingPublic.estimateGas());
         });
     });
 
@@ -1182,6 +1179,74 @@ contract('amm', accounts => {
             // await inspect(u2)
             assert.equal(fromWad(await amm.positionSize()), 200);
             assert.equal(fromWad(await positionSize(u2)), 0);
+        });
+    });
+
+    describe("settle", async () => {
+        beforeEach(async () => {
+            // index
+            await setIndexPrice(7000);
+            const indexPrice = await amm.indexPrice();
+            assert.equal(fromWad(indexPrice.price), 7000);
+
+            // approve
+            await collateral.transfer(u1, toWad(7000 * 100 * 2.1));
+            await collateral.transfer(u2, toWad(7000 * 3));
+            await collateral.approve(perpetual.address, infinity, {
+                from: u1
+            });
+            await collateral.approve(perpetual.address, infinity, {
+                from: u2
+            });
+            await setBroker(u2, proxy.address);
+
+            // create amm
+            await perpetual.deposit(toWad(7000 * 100 * 2.1), {
+                from: u1
+            });
+            await amm.createPool(toWad(100), {
+                from: u1
+            });
+        });
+
+        // this case is similar to "user buys => price increases (below the limit) => long position pays for fundingLoss"
+        it("funding freeze after settling", async () => {
+            await perpetual.deposit(toWad(1000), {
+                from: u2
+            });
+
+            // trading price = 7007
+            // assert.equal(fromWad(await amm.getBuyPrice.call(toWad(0.1))), '7007.007007007007007007');
+            await amm.buy(toWad(0.1), toWad('10000'), infinity, {
+                from: u2
+            });
+
+            // await inspect(u1);
+            // await inspect(u2);
+            // await inspect(proxy.address);
+            // await printFunding();
+
+            assertApproximate(assert, fromWad(await amm.currentFairPrice.call()), '7014.091168245322399477');
+
+            // now fairPrice = 7014, indexPrice = 7000
+            assert.equal(fromWad(await amm.currentFundingRate.call()), '0');
+            assert.equal(fromWad(await amm.currentMarkPrice.call()), '7000');
+
+            // t = 0
+            assertApproximate(assert, fromWad(await positionEntryValue(u2)), '700.700700700700700701');
+            assertApproximate(assert, fromWad(await perpetual.pnl.call(u2)), '-0.700700700700700701');
+
+            await perpetual.beginGlobalSettlement(toWad(7000));
+
+            // t = 600
+            await amm.setBlockTimestamp((await amm.mockBlockTimestamp()).toNumber() + 600);
+            assert.equal(fromWad(await amm.currentFundingRate.call()), '0');
+            assertApproximate(assert, fromWad(await amm.currentMarkPrice.call()), '7000');
+            assertApproximate(assert, fromWad(await amm.currentAccumulatedFundingPerContract.call()), '0');
+            assertApproximate(assert, fromWad(await perpetual.pnl.call(u2)), '-0.700700700700700701');
+
+            // await inspect(u2);
+            // await printFunding();
         });
     });
 });

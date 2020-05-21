@@ -409,6 +409,7 @@ contract AMM is AMMGovernance {
     }
 
     function updateIndex() public {
+        require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         uint256 oldIndexPrice = fundingState.lastIndexPrice;
         forceFunding();
         address devAddress = perpetualProxy.devAddress();
@@ -426,11 +427,17 @@ contract AMM is AMMGovernance {
         fundingState.lastEMAPremium = 0;
     }
 
+    // current* functions need a funding() before return our states. Note: will skip funding()
+    // other than NORMAL
+    //
     // changing conditions for funding:
     // condition 1: time
     // condition 2: indexPrice
     // condition 3: fairPrice - hand over to forceFunding
-    function funding() public {
+    function funding() internal {
+        if (perpetualProxy.status() != LibTypes.Status.NORMAL) {
+            return;
+        }
         uint256 blockTime = getBlockTimestamp();
         uint256 newIndexPrice;
         uint256 newIndexTimestamp;
@@ -506,6 +513,7 @@ contract AMM is AMMGovernance {
     }
 
     function forceFunding() internal {
+        require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         uint256 blockTime = getBlockTimestamp();
         uint256 newIndexPrice;
         uint256 newIndexTimestamp;
@@ -513,11 +521,7 @@ contract AMM is AMMGovernance {
         forceFunding(blockTime, newIndexPrice, newIndexTimestamp);
     }
 
-    function forceFunding(
-        uint256 blockTime,
-        uint256 newIndexPrice,
-        uint256 newIndexTimestamp
-    ) internal {
+    function forceFunding(uint256 blockTime, uint256 newIndexPrice, uint256 newIndexTimestamp) private {
         if (fundingState.lastFundingTime == 0) {
             // funding initialization required. but in this case, it's safe to just do nothing and return
             return;

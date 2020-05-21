@@ -601,6 +601,7 @@ contract('amm-eth', accounts => {
             await setIndexPrice(8000);
             await amm.updateIndex({ from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 1);
+
         });
     });
 
@@ -618,7 +619,14 @@ contract('amm-eth', accounts => {
         });
 
         it("settle", async () => {
+            const fundingState1 = await amm.currentFundingState.call();
+            
+            // await inspect(u1, perpetual, proxy, amm);
+            // await printFunding(amm, perpetual);
             await perpetual.beginGlobalSettlement(toWad(1 / 160));
+            await amm.setBlockTimestamp(parseInt(fundingState1.lastFundingTime) + 86400 * 1);
+
+            // await inspect(u1, perpetual, proxy, amm);
             assert.equal(fromWad(await share.balanceOf(u1)), 3360);
             try {
                 await amm.removeLiquidity(toWad(3360), { from: u1 });
@@ -627,20 +635,49 @@ contract('amm-eth', accounts => {
                 assert.ok(error.message.includes("wrong perpetual status"), error);
             }
 
+            const fundingState2 = await amm.currentFundingState.call();
+            assert.equal(fundingState2.lastFundingTime, fundingState1.lastFundingTime, "never funding() after setting");
+            assert.equal(fundingState2.lastPremium, fundingState1.lastPremium, "never funding() after setting");
+            assert.equal(fundingState2.lastEMAPremium, fundingState1.lastEMAPremium, "never funding() after setting");
+            assert.equal(fundingState2.lastIndexPrice, fundingState1.lastIndexPrice, "never funding() after setting");
+            assert.equal(fundingState2.accumulatedFundingPerContract, fundingState1.accumulatedFundingPerContract, "never funding() after setting");
+
             await perpetual.endGlobalSettlement();
+            await amm.setBlockTimestamp(parseInt(fundingState1.lastFundingTime) + 86400 * 2);
+
             assert.equal(fromWad(await share.balanceOf(u1)), 3360);
             await amm.settleShare({ from: u1 });
             await perpetual.settle({ from: u1 });
 
             assert.equal(fromWad(await share.balanceOf(u1)), 0);
             let u1Balance2 = new BigNumber(await web3.eth.getBalance(u1));
-            console.log(fromWad(u1Balance.minus(u1Balance2)))
+            // console.log(fromWad(u1Balance.minus(u1Balance2)))
             assertApproximate(assert, fromWad(u1Balance.minus(u1Balance2)), 0, 0.5);
+
+            const fundingState3 = await amm.currentFundingState.call();
+            assert.equal(fundingState3.lastFundingTime, fundingState1.lastFundingTime, "never funding() after setting");
+            assert.equal(fundingState3.lastPremium, fundingState1.lastPremium, "never funding() after setting");
+            assert.equal(fundingState3.lastEMAPremium, fundingState1.lastEMAPremium, "never funding() after setting");
+            assert.equal(fundingState3.lastIndexPrice, fundingState1.lastIndexPrice, "never funding() after setting");
+            assert.equal(fundingState3.accumulatedFundingPerContract, fundingState1.accumulatedFundingPerContract, "never funding() after setting");
 
             // await inspect(u1, perpetual, proxy, amm);
             // await printFunding(amm, perpetual);
         });
 
+        it("updateIndex failed", async () => {
+            await amm.setGovernanceParameter(toBytes32("updatePremiumPrize"), toWad(0));
+            
+            await perpetual.beginGlobalSettlement(toWad(1 / 160));
+
+            await setIndexPrice(1 / 162);
+            try {
+                await amm.updateIndex({ from: u2 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong perpetual status"), error);
+            }
+        });
     });
 
     describe("case review", async () => {
