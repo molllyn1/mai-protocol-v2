@@ -3,6 +3,7 @@ pragma solidity 0.5.8;
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../interface/IChainlinkFeeder.sol";
 
+
 contract InversedChainlinkAdapter {
     using LibMathSigned for int256;
     int256 public constant ONE = 1e18;

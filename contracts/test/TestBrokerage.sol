@@ -3,6 +3,7 @@ pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../perpetual/Brokerage.sol";
 
+
 contract TestBrokerage is Brokerage {
     function setBrokerPublic(address trader, address guy, uint256 delay) public {
         setBroker(trader, guy, delay);

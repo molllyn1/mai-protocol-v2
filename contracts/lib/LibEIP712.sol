@@ -1,5 +1,6 @@
 pragma solidity 0.5.8;
 
+
 library LibEIP712 {
     string internal constant DOMAIN_NAME = "Mai Protocol";
 

@@ -48,6 +48,10 @@ contract Exchange {
         uint256 takerOpened;
 
         for (uint256 i = 0; i < makerOrderParams.length; i++) {
+            if (amounts[i] == 0) {
+                continue;
+            }
+
             require(takerOrderParam.trader != makerOrderParams[i].trader, "self trade");
             require(takerOrderParam.isInversed() == makerOrderParams[i].isInversed(), "invalid inversed pair");
             require(takerOrderParam.isSell() != makerOrderParams[i].isSell(), "invalid side");
@@ -110,7 +114,15 @@ contract Exchange {
         return takerOpened;
     }
 
-    function matchOrderWithAMM(LibOrder.OrderParam memory takerOrderParam, address _perpetual, uint256 amount) public {
+    function matchOrderWithAMM(
+        LibOrder.OrderParam memory takerOrderParam,
+        address _perpetual,
+        uint256 amount
+    ) public {
+        if (amount == 0) {
+            return;
+        }
+
         require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
 
         IPerpetual perpetual = IPerpetual(_perpetual);
@@ -163,13 +175,18 @@ contract Exchange {
         require(orderParam.getExpiredAt() >= block.timestamp, "order expired");
 
         bytes32 orderHash = orderParam.getOrderHash(address(perpetual), broker);
+        require(!cancelled[orderHash], "cancelled order");
         require(orderParam.signature.isValidSignature(orderHash, orderParam.trader), "invalid signature");
         require(filled[orderHash] < orderParam.amount, "fullfilled order");
 
         return orderHash;
     }
 
-    function claimTradingFee(IPerpetual perpetual, address trader, int256 fee) internal {
+    function claimTradingFee(
+        IPerpetual perpetual,
+        address trader,
+        int256 fee
+    ) internal {
         if (fee > 0) {
             perpetual.transferCashBalance(trader, msg.sender, fee.toUint256());
         } else if (fee < 0) {

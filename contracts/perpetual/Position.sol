@@ -81,6 +81,7 @@ contract Position is Collateral, PerpetualGovernance {
         socialLossPerContracts[uint256(side)] = newVal;
         emit SocialLoss(side, newVal);
     }
+
     function marginBalanceWithPrice(address guy, uint256 markPrice) internal returns (int256) {
         return cashBalances[guy].balance.add(pnlWithPrice(guy, markPrice));
     }

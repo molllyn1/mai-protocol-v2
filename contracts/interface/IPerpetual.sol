@@ -51,9 +51,18 @@ interface IPerpetual {
 
     function isIMSafeWithPrice(address guy, uint256 currentMarkPrice) external returns (bool);
 
-    function tradePosition(address guy, LibTypes.Side side, uint256 price, uint256 amount) external returns (uint256);
+    function tradePosition(
+        address guy,
+        LibTypes.Side side,
+        uint256 price,
+        uint256 amount
+    ) external returns (uint256);
 
-    function transferCashBalance(address from, address to, uint256 amount) external;
+    function transferCashBalance(
+        address from,
+        address to,
+        uint256 amount
+    ) external;
 
     function setBrokerFor(address guy, address broker) external;
 
@@ -65,7 +74,15 @@ interface IPerpetual {
 
     function liquidate(address guy, uint256 amount) external returns (uint256, uint256);
 
-    function liquidateFrom(address from, address guy, uint256 amount) external returns (uint256, uint256);
+    function liquidateFrom(
+        address from,
+        address guy,
+        uint256 amount
+    ) external returns (uint256, uint256);
 
     function insuranceFundBalance() external view returns (int256);
+
+    function isWhitelistAdmin(address guy) external view returns (bool);
+
+    function beginGlobalSettlement(uint256 price) external;
 }

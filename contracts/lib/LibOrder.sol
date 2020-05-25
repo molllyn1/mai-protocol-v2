@@ -55,11 +55,11 @@ library LibOrder {
         LibSignature.OrderSignature signature;
     }
 
-    function getOrderHash(OrderParam memory orderParam, address perpetual, address broker)
-        internal
-        pure
-        returns (bytes32 orderHash)
-    {
+    function getOrderHash(
+        OrderParam memory orderParam,
+        address perpetual,
+        address broker
+    ) internal pure returns (bytes32 orderHash) {
         Order memory order = getOrder(orderParam, perpetual, broker);
         orderHash = LibEIP712.hashEIP712Message(hashOrder(order));
         return orderHash;
@@ -70,11 +70,11 @@ library LibOrder {
         return orderHash;
     }
 
-    function getOrder(OrderParam memory orderParam, address perpetual, address broker)
-        internal
-        pure
-        returns (LibOrder.Order memory order)
-    {
+    function getOrder(
+        OrderParam memory orderParam,
+        address perpetual,
+        address broker
+    ) internal pure returns (LibOrder.Order memory order) {
         order.trader = orderParam.trader;
         order.broker = broker;
         order.perpetual = perpetual;

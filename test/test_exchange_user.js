@@ -169,7 +169,7 @@ contract('exchange-user', accounts => {
             await perpetual.beginGlobalSettlement(toWad(6700));
 
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("wrong perpetual status"));
@@ -178,7 +178,7 @@ contract('exchange-user', accounts => {
             await perpetual.endGlobalSettlement();
 
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("wrong perpetual status"));
@@ -216,7 +216,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, admin);
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("self trade"));
@@ -254,7 +254,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, admin);
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("invalid side"));
@@ -292,7 +292,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, admin);
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("market order cannot be maker"));
@@ -330,7 +330,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, admin);
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(2) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(2)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("taker overfilled"), error);
@@ -368,7 +368,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, admin);
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(2) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(2)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("maker overfilled"), error);
@@ -408,7 +408,7 @@ contract('exchange-user', accounts => {
             }, perpetual.address, admin);
 
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("invalid trading lot size"), error);
@@ -449,7 +449,7 @@ contract('exchange-user', accounts => {
             }, perpetual.address, admin);
 
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("maker margin"), error);
@@ -472,8 +472,134 @@ contract('exchange-user', accounts => {
             try {
                 await exchange.cancelOrder(takerParam, { from: u2 });
                 throw null;
-            } catch  (error) {
+            } catch (error) {
                 assert.ok(error.message.includes("invalid caller"), error);
+            }
+        });
+
+        it("cancel order - taker", async () => {
+            await collateral.transfer(u1, toWad(10000));
+            await collateral.approve(perpetual.address, infinity, {
+                from: u1
+            });
+            await perpetual.deposit(toWad(10000), {
+                from: u1
+            });
+            assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
+            await perpetual.setBroker(admin, {
+                from: u1
+            });
+
+            await collateral.transfer(u2, toWad(10000));
+            await collateral.approve(perpetual.address, infinity, {
+                from: u2
+            });
+            await perpetual.deposit(toWad(10000), {
+                from: u2
+            });
+            assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
+            await perpetual.setBroker(admin, {
+                from: u2
+            });
+
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            await exchange.cancelOrder(takerParam);
+
+            try {
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("cancelled order"), error);
+            }
+        });
+
+        it("cancel order - maker", async () => {
+            await collateral.transfer(u1, toWad(10000));
+            await collateral.approve(perpetual.address, infinity, {
+                from: u1
+            });
+            await perpetual.deposit(toWad(10000), {
+                from: u1
+            });
+            assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
+            await perpetual.setBroker(admin, {
+                from: u1
+            });
+
+            await collateral.transfer(u2, toWad(10000));
+            await collateral.approve(perpetual.address, infinity, {
+                from: u2
+            });
+            await perpetual.deposit(toWad(10000), {
+                from: u2
+            });
+            assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
+            await perpetual.setBroker(admin, {
+                from: u2
+            });
+
+            await funding.setMarkPrice(toWad(6000));
+
+            const takerParam = await buildOrder({
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            const makerParam = await buildOrder({
+                trader: u2,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            }, perpetual.address, admin);
+
+            await exchange.cancelOrder(makerParam);
+
+            try {
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("cancelled order"), error);
             }
         });
 
@@ -511,7 +637,7 @@ contract('exchange-user', accounts => {
             }, perpetual.address, admin);
 
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("taker margin"), error);
@@ -546,7 +672,7 @@ contract('exchange-user', accounts => {
                 expiredAtSeconds: 86400,
                 salt: 666,
             }, perpetual.address, admin);
-            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+            await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
         });
 
         it("no dev", async () => {
@@ -577,7 +703,7 @@ contract('exchange-user', accounts => {
                 expiredAtSeconds: 86400,
                 salt: 666,
             }, perpetual.address, admin);
-            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+            await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
         });
 
         it("dev unsafe", async () => {
@@ -614,7 +740,7 @@ contract('exchange-user', accounts => {
             }, perpetual.address, admin);
 
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("dev unsafe"), error);
@@ -653,7 +779,7 @@ contract('exchange-user', accounts => {
                 takerFeeRate: 1000,
                 salt: 666,
             }, perpetual.address, admin);
-            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+            await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
 
             await funding.setMarkPrice(toWad(16000));
             takerParam = await buildOrder({
@@ -681,7 +807,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, admin);
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(0.1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(0.1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("maker unsafe"), error);
@@ -719,7 +845,7 @@ contract('exchange-user', accounts => {
                 takerFeeRate: 1000,
                 salt: 666,
             }, perpetual.address, admin);
-            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+            await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
 
             await funding.setMarkPrice(toWad(16000));
             takerParam = await buildOrder({
@@ -747,7 +873,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, admin);
             try {
-                await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(0.1) ]);
+                await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(0.1)]);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("maker unsafe"), error);
@@ -784,7 +910,7 @@ contract('exchange-user', accounts => {
                 takerFeeRate: 1000,
                 salt: 666,
             }, perpetual.address, admin);
-            await exchange.matchOrders(takerParam, [ makerParam ], perpetual.address, [ toWad(1) ]);
+            await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
         });
     });
 
@@ -819,33 +945,33 @@ contract('exchange-user', accounts => {
 
         await exchange.matchOrders(
             await buildOrder({
-                    trader: u1,
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                salt: 666,
+            },
+                perpetual.address,
+                admin
+            ),
+            [
+                await buildOrder({
+                    trader: u2,
                     amount: 1,
                     price: 6000,
                     version: 2,
-                    side: 'sell',
+                    side: 'buy',
                     type: 'limit',
                     expiredAtSeconds: 86400,
                     makerFeeRate: 0,
                     takerFeeRate: 0,
                     salt: 666,
                 },
-                perpetual.address,
-                admin
-            ),
-            [
-                await buildOrder({
-                        trader: u2,
-                        amount: 1,
-                        price: 6000,
-                        version: 2,
-                        side: 'buy',
-                        type: 'limit',
-                        expiredAtSeconds: 86400,
-                        makerFeeRate: 0,
-                        takerFeeRate: 0,
-                        salt: 666,
-                    },
                     perpetual.address,
                     admin
                 )
@@ -860,33 +986,33 @@ contract('exchange-user', accounts => {
 
         await exchange.matchOrders(
             await buildOrder({
-                    trader: u1,
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                salt: 666,
+            },
+                perpetual.address,
+                admin
+            ),
+            [
+                await buildOrder({
+                    trader: u2,
                     amount: 1,
                     price: 6000,
                     version: 2,
-                    side: 'buy',
+                    side: 'sell',
                     type: 'limit',
                     expiredAtSeconds: 86400,
                     makerFeeRate: 0,
                     takerFeeRate: 0,
                     salt: 666,
                 },
-                perpetual.address,
-                admin
-            ),
-            [
-                await buildOrder({
-                        trader: u2,
-                        amount: 1,
-                        price: 6000,
-                        version: 2,
-                        side: 'sell',
-                        type: 'limit',
-                        expiredAtSeconds: 86400,
-                        makerFeeRate: 0,
-                        takerFeeRate: 0,
-                        salt: 666,
-                    },
                     perpetual.address,
                     admin
                 )
@@ -907,33 +1033,33 @@ contract('exchange-user', accounts => {
 
         await exchange.matchOrders(
             await buildOrder({
-                    trader: u1,
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                salt: 666,
+            },
+                perpetual.address,
+                admin
+            ),
+            [
+                await buildOrder({
+                    trader: u2,
                     amount: 1,
                     price: 6000,
                     version: 2,
-                    side: 'sell',
+                    side: 'buy',
                     type: 'limit',
                     expiredAtSeconds: 86400,
                     makerFeeRate: 0,
                     takerFeeRate: 0,
                     salt: 666,
                 },
-                perpetual.address,
-                admin
-            ),
-            [
-                await buildOrder({
-                        trader: u2,
-                        amount: 1,
-                        price: 6000,
-                        version: 2,
-                        side: 'buy',
-                        type: 'limit',
-                        expiredAtSeconds: 86400,
-                        makerFeeRate: 0,
-                        takerFeeRate: 0,
-                        salt: 666,
-                    },
                     perpetual.address,
                     admin
                 )
@@ -950,33 +1076,33 @@ contract('exchange-user', accounts => {
             await funding.setMarkPrice(toWad(50));
             await exchange.matchOrders(
                 await buildOrder({
-                        trader: u1,
+                    trader: u1,
+                    amount: 1,
+                    price: 5399,
+                    version: 2,
+                    side: 'buy',
+                    type: 'limit',
+                    expiredAtSeconds: 86400,
+                    makerFeeRate: 0,
+                    takerFeeRate: 0,
+                    salt: 666,
+                },
+                    perpetual.address,
+                    admin
+                ),
+                [
+                    await buildOrder({
+                        trader: u2,
                         amount: 1,
                         price: 5399,
                         version: 2,
-                        side: 'buy',
+                        side: 'sell',
                         type: 'limit',
                         expiredAtSeconds: 86400,
                         makerFeeRate: 0,
                         takerFeeRate: 0,
                         salt: 666,
                     },
-                    perpetual.address,
-                    admin
-                ),
-                [
-                    await buildOrder({
-                            trader: u2,
-                            amount: 1,
-                            price: 5399,
-                            version: 2,
-                            side: 'sell',
-                            type: 'limit',
-                            expiredAtSeconds: 86400,
-                            makerFeeRate: 0,
-                            takerFeeRate: 0,
-                            salt: 666,
-                        },
                         perpetual.address,
                         admin
                     )
@@ -994,33 +1120,33 @@ contract('exchange-user', accounts => {
         await funding.setMarkPrice(toWad("5400.000000000000000001"));
         await exchange.matchOrders(
             await buildOrder({
-                    trader: u1,
+                trader: u1,
+                amount: 1,
+                price: "5400.000000000000000001",
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                salt: 666,
+            },
+                perpetual.address,
+                admin
+            ),
+            [
+                await buildOrder({
+                    trader: u2,
                     amount: 1,
                     price: "5400.000000000000000001",
                     version: 2,
-                    side: 'buy',
+                    side: 'sell',
                     type: 'limit',
                     expiredAtSeconds: 86400,
                     makerFeeRate: 0,
                     takerFeeRate: 0,
                     salt: 666,
                 },
-                perpetual.address,
-                admin
-            ),
-            [
-                await buildOrder({
-                        trader: u2,
-                        amount: 1,
-                        price: "5400.000000000000000001",
-                        version: 2,
-                        side: 'sell',
-                        type: 'limit',
-                        expiredAtSeconds: 86400,
-                        makerFeeRate: 0,
-                        takerFeeRate: 0,
-                        salt: 666,
-                    },
                     perpetual.address,
                     admin
                 )
@@ -1090,7 +1216,7 @@ contract('exchange-user', accounts => {
             salt: 666,
         }, perpetual.address, admin);
 
-        await exchange.matchOrders(
+        const tx = await exchange.matchOrders(
             takerParam,
             [
                 makerParam
@@ -1100,6 +1226,8 @@ contract('exchange-user', accounts => {
                 toWad(1)
             ]
         );
+
+        console.log(tx);
 
         assert.equal(fromWad(await cashBalanceOf(u1)), 9880);
         assert.equal(fromWad(await positionEntryValue(u1)), 6000);
@@ -1115,6 +1243,86 @@ contract('exchange-user', accounts => {
         assert.equal(fromWad(await cashBalanceOf(dev)), 180);
     });
 
+    it("trade 0 amount", async () => {
+        await collateral.transfer(u1, toWad(10000));
+        await collateral.approve(perpetual.address, infinity, {
+            from: u1
+        });
+        await perpetual.deposit(toWad(10000), {
+            from: u1
+        });
+        assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
+        await perpetual.setBroker(admin, {
+            from: u1
+        });
+
+        await collateral.transfer(u2, toWad(10000));
+        await collateral.approve(perpetual.address, infinity, {
+            from: u2
+        });
+        await perpetual.deposit(toWad(10000), {
+            from: u2
+        });
+        assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
+        await perpetual.setBroker(admin, {
+            from: u2
+        });
+
+        await funding.setMarkPrice(toWad(6000));
+
+        const takerParam = await buildOrder({
+            trader: u1,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'sell',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 1000,
+            takerFeeRate: 1000,
+            salt: 666,
+        }, perpetual.address, admin);
+
+        const makerParam = await buildOrder({
+            trader: u2,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'buy',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 1000,
+            takerFeeRate: 1000,
+            salt: 666,
+        }, perpetual.address, admin);
+
+        const tx = await exchange.matchOrders(
+            takerParam,
+            [
+                makerParam
+            ],
+            perpetual.address,
+            [
+                toWad(0)
+            ]
+        );
+
+        console.log(tx);
+
+        assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
+        assert.equal(fromWad(await positionEntryValue(u1)), 0);
+        assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 0);
+        assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 10000);
+
+        assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
+        assert.equal(fromWad(await positionEntryValue(u2)), 0);
+        assert.equal(fromWad(await perpetual.maintenanceMargin.call(u2)), 0);
+        assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 10000);
+
+        assert.equal(fromWad(await cashBalanceOf(admin)), 0);
+        assert.equal(fromWad(await cashBalanceOf(dev)), 0);
+    });
+
     it("close", async () => {
         await initialize(u1, 10000);
         await initialize(u2, 10000);
@@ -1122,33 +1330,33 @@ contract('exchange-user', accounts => {
 
         await exchange.matchOrders(
             await buildOrder({
-                    trader: u1,
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'sell',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            },
+                perpetual.address,
+                admin
+            ),
+            [
+                await buildOrder({
+                    trader: u2,
                     amount: 1,
                     price: 6000,
                     version: 2,
-                    side: 'sell',
+                    side: 'buy',
                     type: 'limit',
                     expiredAtSeconds: 86400,
                     makerFeeRate: 1000,
                     takerFeeRate: 1000,
                     salt: 666,
                 },
-                perpetual.address,
-                admin
-            ),
-            [
-                await buildOrder({
-                        trader: u2,
-                        amount: 1,
-                        price: 6000,
-                        version: 2,
-                        side: 'buy',
-                        type: 'limit',
-                        expiredAtSeconds: 86400,
-                        makerFeeRate: 1000,
-                        takerFeeRate: 1000,
-                        salt: 666,
-                    },
                     perpetual.address,
                     admin
                 )
@@ -1174,33 +1382,33 @@ contract('exchange-user', accounts => {
 
         await exchange.matchOrders(
             await buildOrder({
-                    trader: u1,
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 1000,
+                takerFeeRate: 1000,
+                salt: 666,
+            },
+                perpetual.address,
+                admin
+            ),
+            [
+                await buildOrder({
+                    trader: u2,
                     amount: 1,
                     price: 6000,
                     version: 2,
-                    side: 'buy',
+                    side: 'sell',
                     type: 'limit',
                     expiredAtSeconds: 86400,
                     makerFeeRate: 1000,
                     takerFeeRate: 1000,
                     salt: 666,
                 },
-                perpetual.address,
-                admin
-            ),
-            [
-                await buildOrder({
-                        trader: u2,
-                        amount: 1,
-                        price: 6000,
-                        version: 2,
-                        side: 'sell',
-                        type: 'limit',
-                        expiredAtSeconds: 86400,
-                        makerFeeRate: 1000,
-                        takerFeeRate: 1000,
-                        salt: 666,
-                    },
                     perpetual.address,
                     admin
                 )
@@ -1233,33 +1441,33 @@ contract('exchange-user', accounts => {
         try {
             await exchange.matchOrders(
                 await buildOrder({
-                        trader: u1,
+                    trader: u1,
+                    amount: 1,
+                    price: 6000,
+                    version: 2,
+                    side: 'sell',
+                    type: 'limit',
+                    expiredAtSeconds: 86400,
+                    makerFeeRate: 1000,
+                    takerFeeRate: 1000,
+                    salt: 666,
+                },
+                    perpetual.address,
+                    admin
+                ),
+                [
+                    await buildOrder({
+                        trader: u2,
                         amount: 1,
-                        price: 6000,
+                        price: 5800,
                         version: 2,
-                        side: 'sell',
+                        side: 'buy',
                         type: 'limit',
                         expiredAtSeconds: 86400,
                         makerFeeRate: 1000,
                         takerFeeRate: 1000,
                         salt: 666,
                     },
-                    perpetual.address,
-                    admin
-                ),
-                [
-                    await buildOrder({
-                            trader: u2,
-                            amount: 1,
-                            price: 5800,
-                            version: 2,
-                            side: 'buy',
-                            type: 'limit',
-                            expiredAtSeconds: 86400,
-                            makerFeeRate: 1000,
-                            takerFeeRate: 1000,
-                            salt: 666,
-                        },
                         perpetual.address,
                         admin
                     )
@@ -1275,7 +1483,7 @@ contract('exchange-user', accounts => {
         }
     });
 
-     it("maker only", async () => {
+    it("maker only", async () => {
         await initialize(u1, 10000);
         await initialize(u2, 10000);
         await funding.setMarkPrice(toWad(6000));
@@ -1283,11 +1491,28 @@ contract('exchange-user', accounts => {
         try {
             await exchange.matchOrders(
                 await buildOrder({
-                        trader: u1,
+                    trader: u1,
+                    amount: 1,
+                    price: 6000,
+                    version: 2,
+                    side: 'sell',
+                    type: 'limit',
+                    expiredAtSeconds: 86400,
+                    makerFeeRate: 1000,
+                    takerFeeRate: 1000,
+                    salt: 666,
+                    makerOnly: true,
+                },
+                    perpetual.address,
+                    admin
+                ),
+                [
+                    await buildOrder({
+                        trader: u2,
                         amount: 1,
-                        price: 6000,
+                        price: 5800,
                         version: 2,
-                        side: 'sell',
+                        side: 'buy',
                         type: 'limit',
                         expiredAtSeconds: 86400,
                         makerFeeRate: 1000,
@@ -1295,23 +1520,6 @@ contract('exchange-user', accounts => {
                         salt: 666,
                         makerOnly: true,
                     },
-                    perpetual.address,
-                    admin
-                ),
-                [
-                    await buildOrder({
-                            trader: u2,
-                            amount: 1,
-                            price: 5800,
-                            version: 2,
-                            side: 'buy',
-                            type: 'limit',
-                            expiredAtSeconds: 86400,
-                            makerFeeRate: 1000,
-                            takerFeeRate: 1000,
-                            salt: 666,
-                            makerOnly: true,
-                        },
                         perpetual.address,
                         admin
                     )
@@ -1335,33 +1543,33 @@ contract('exchange-user', accounts => {
         try {
             await exchange.matchOrders(
                 await buildOrder({
-                        trader: u1,
+                    trader: u1,
+                    amount: 1,
+                    price: 6000,
+                    version: 2,
+                    side: 'sell',
+                    type: 'limit',
+                    expiredAtSeconds: 86400,
+                    makerFeeRate: 1000,
+                    takerFeeRate: 1000,
+                    salt: 666,
+                },
+                    perpetual.address,
+                    admin
+                ),
+                [
+                    await buildOrder({
+                        trader: u2,
                         amount: 1,
-                        price: 6000,
+                        price: 5800,
                         version: 2,
-                        side: 'sell',
+                        side: 'buy',
                         type: 'limit',
                         expiredAtSeconds: 86400,
                         makerFeeRate: 1000,
                         takerFeeRate: 1000,
                         salt: 666,
                     },
-                    perpetual.address,
-                    admin
-                ),
-                [
-                    await buildOrder({
-                            trader: u2,
-                            amount: 1,
-                            price: 5800,
-                            version: 2,
-                            side: 'buy',
-                            type: 'limit',
-                            expiredAtSeconds: 86400,
-                            makerFeeRate: 1000,
-                            takerFeeRate: 1000,
-                            salt: 666,
-                        },
                         perpetual.address,
                         admin
                     )
@@ -1370,8 +1578,8 @@ contract('exchange-user', accounts => {
                 [
                     toWad(1)
                 ], {
-                    from: u1
-                }
+                from: u1
+            }
             );
             throw null;
         } catch (error) {
@@ -1387,33 +1595,33 @@ contract('exchange-user', accounts => {
         try {
             await exchange.matchOrders(
                 await buildOrder({
-                        trader: u1,
+                    trader: u1,
+                    amount: 1,
+                    price: 6000,
+                    version: 2,
+                    side: 'sell',
+                    type: 'limit',
+                    expiredAtSeconds: 86400,
+                    makerFeeRate: 1000,
+                    takerFeeRate: 1000,
+                    salt: 666,
+                },
+                    perpetual.address,
+                    admin
+                ),
+                [
+                    await buildOrder({
+                        trader: u2,
                         amount: 1,
-                        price: 6000,
+                        price: 5800,
                         version: 2,
-                        side: 'sell',
+                        side: 'buy',
                         type: 'limit',
                         expiredAtSeconds: 86400,
                         makerFeeRate: 1000,
                         takerFeeRate: 1000,
                         salt: 666,
                     },
-                    perpetual.address,
-                    admin
-                ),
-                [
-                    await buildOrder({
-                            trader: u2,
-                            amount: 1,
-                            price: 5800,
-                            version: 2,
-                            side: 'buy',
-                            type: 'limit',
-                            expiredAtSeconds: 86400,
-                            makerFeeRate: 1000,
-                            takerFeeRate: 1000,
-                            salt: 666,
-                        },
                         perpetual.address,
                         admin
                     )
@@ -1422,8 +1630,8 @@ contract('exchange-user', accounts => {
                 [
                     toWad(1)
                 ], {
-                    from: u1
-                }
+                from: u1
+            }
             );
             throw null;
         } catch (error) {
@@ -1439,33 +1647,33 @@ contract('exchange-user', accounts => {
         try {
             await exchange.matchOrders(
                 await buildOrder({
-                        trader: u1,
+                    trader: u1,
+                    amount: 1,
+                    price: 6000,
+                    version: 2,
+                    side: 'sell',
+                    type: 'limit',
+                    expiredAtSeconds: 86400,
+                    makerFeeRate: 1000,
+                    takerFeeRate: 1000,
+                    salt: 666,
+                },
+                    perpetual.address,
+                    admin
+                ),
+                [
+                    await buildOrder({
+                        trader: u2,
                         amount: 1,
                         price: 6000,
                         version: 2,
-                        side: 'sell',
+                        side: 'buy',
                         type: 'limit',
                         expiredAtSeconds: 86400,
                         makerFeeRate: 1000,
                         takerFeeRate: 1000,
                         salt: 666,
                     },
-                    perpetual.address,
-                    admin
-                ),
-                [
-                    await buildOrder({
-                            trader: u2,
-                            amount: 1,
-                            price: 6000,
-                            version: 2,
-                            side: 'buy',
-                            type: 'limit',
-                            expiredAtSeconds: 86400,
-                            makerFeeRate: 1000,
-                            takerFeeRate: 1000,
-                            salt: 666,
-                        },
                         exchange.address,
                         admin
                     )
@@ -1791,8 +1999,8 @@ contract('exchange-user', accounts => {
                 [makerParam],
                 perpetual.address,
                 [toWad(1)], {
-                    from: u3
-                }
+                from: u3
+            }
             );
 
             // taker dev0.01 + trade0.01 = 120
@@ -1872,8 +2080,8 @@ contract('exchange-user', accounts => {
                     [makerParam],
                     perpetual.address,
                     [toWad(1)], {
-                        from: u3
-                    }
+                    from: u3
+                }
                 );
                 throw null;
             } catch (error) {
@@ -1945,8 +2153,8 @@ contract('exchange-user', accounts => {
                     [makerParam],
                     perpetual.address,
                     [toWad(1)], {
-                        from: u3
-                    }
+                    from: u3
+                }
                 );
                 throw null;
             } catch (error) {
@@ -2047,8 +2255,8 @@ contract('exchange-user', accounts => {
                     [await buildOrder(mp, perpetual.address, admin)],
                     perpetual.address,
                     [toWad(1)], {
-                        from: u3
-                    }
+                    from: u3
+                }
                 );
                 throw null;
             } catch (error) {
@@ -2089,17 +2297,17 @@ contract('exchange-user', accounts => {
         });
         it("cancel order", async () => {
             const order = await buildOrder({
-                    trader: u1,
-                    amount: 1,
-                    price: 6000,
-                    version: 2,
-                    side: 'buy',
-                    type: 'limit',
-                    expiredAtSeconds: 86400,
-                    makerFeeRate: 0,
-                    takerFeeRate: 0,
-                    salt: 666,
-                },
+                trader: u1,
+                amount: 1,
+                price: 6000,
+                version: 2,
+                side: 'buy',
+                type: 'limit',
+                expiredAtSeconds: 86400,
+                makerFeeRate: 0,
+                takerFeeRate: 0,
+                salt: 666,
+            },
                 perpetual.address,
                 admin
             );
