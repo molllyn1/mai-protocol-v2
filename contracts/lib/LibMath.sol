@@ -109,6 +109,7 @@ library LibMathSigned {
     // NOTE: n is a normal integer, do not shift 18 decimals
     // solium-disable-next-line security/no-assign-params
     function wpowi(int256 x, int256 n) internal pure returns (int256 z) {
+        require(n >= 0, "wpowi only supports n >= 0");
         z = n % 2 != 0 ? x : _WAD;
 
         for (n /= 2; n != 0; n /= 2) {

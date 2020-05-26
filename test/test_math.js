@@ -362,6 +362,13 @@ contract('testMath', accounts => {
 
         // 0.9999999 ^ 100001 = 0.99
         assertApproximate(assert, fromWad(await testSignedMath.wpowi('999999900000000000', 100001)), '0.990049734249159778', '1e-14');
+
+        try {
+            await testSignedMath.wpowi(1, -1);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("only supports"), error);
+        }
     });
 
     it("log", async () => {
