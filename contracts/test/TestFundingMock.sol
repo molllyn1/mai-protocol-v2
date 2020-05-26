@@ -12,7 +12,7 @@ contract TestFundingMock {
 
     uint256 public _markPrice;
     int256 public _accumulatedFundingPerContract;
-    uint256 public constant ONE = 1e18;
+    uint256 public constant ONE = 10**18;
 
     function setMarkPrice(uint256 price) public returns (uint256) {
         _markPrice = price;

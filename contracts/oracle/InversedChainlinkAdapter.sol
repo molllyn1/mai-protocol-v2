@@ -6,7 +6,7 @@ import "../interface/IChainlinkFeeder.sol";
 
 contract InversedChainlinkAdapter {
     using LibMathSigned for int256;
-    int256 public constant ONE = 1e18;
+    int256 public constant ONE = 10**18;
 
     IChainlinkFeeder public feeder;
     int256 public constant chainlinkDecimalsAdapter = 10**10;
