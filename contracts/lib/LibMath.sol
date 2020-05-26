@@ -15,7 +15,8 @@ library LibMathSigned {
     }
 
     /**
-     * @dev wmultiplies two signed integers, reverts on overflow.
+     * @dev Multiplies two signed integers, reverts on overflow
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SignedSafeMath.sol#L13
      */
     function mul(int256 a, int256 b) internal pure returns (int256) {
         // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
@@ -33,7 +34,8 @@ library LibMathSigned {
     }
 
     /**
-     * @dev Integer wdivision of two signed integers truncating the quotient, reverts on wdivision by zero.
+     * @dev Integer division of two signed integers truncating the quotient, reverts on division by zero.
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SignedSafeMath.sol#L32
      */
     function div(int256 a, int256 b) internal pure returns (int256) {
         require(b != 0, "wdivision by zero");
@@ -46,6 +48,7 @@ library LibMathSigned {
 
     /**
      * @dev Subtracts two signed integers, reverts on overflow.
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SignedSafeMath.sol#L44
      */
     function sub(int256 a, int256 b) internal pure returns (int256) {
         int256 c = a - b;
@@ -56,6 +59,7 @@ library LibMathSigned {
 
     /**
      * @dev Adds two signed integers, reverts on overflow.
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SignedSafeMath.sol#L54
      */
     function add(int256 a, int256 b) internal pure returns (int256) {
         int256 c = a + b;
@@ -95,6 +99,7 @@ library LibMathSigned {
         return x >= y ? x : y;
     }
 
+    // see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/utils/SafeCast.sol#L103
     function toUint256(int256 x) internal pure returns (uint256) {
         require(x >= 0, "int overflow");
         return uint256(x);
@@ -123,7 +128,8 @@ library LibMathSigned {
     int256 internal constant longer_fixed_1 = 1000000000000000000000000000000000000;
     int256 internal constant longer_fixed_log_e_10 = 2302585092994045684017991454684364208;
 
-    // ROUND_HALF_UP rule helper. 0.5 ≈ 1, 0.4 ≈ 0, -0.5 ≈ -1, -0.4 ≈ 0
+    // ROUND_HALF_UP rule helper. You have to call roundHalfUp(x, y) / y to finish the rounding operation
+    // 0.5 ≈ 1, 0.4 ≈ 0, -0.5 ≈ -1, -0.4 ≈ 0
     function roundHalfUp(int256 x, int256 y) internal pure returns (int256) {
         require(y > 0, "roundHalfUp only supports y > 0");
         if (x >= 0) {
@@ -133,7 +139,7 @@ library LibMathSigned {
     }
 
     // function roundFloor(int256 x, int256 y) internal pure returns (int256) {
-    //     require(y > 0, "roundHalfUp only supports y > 0");
+    //     require(y > 0, "roundFloor only supports y > 0");
     //     if (x >= 0 || x % _WAD == 0) {
     //         return x;
     //     }
@@ -141,7 +147,7 @@ library LibMathSigned {
     // }
 
     // function roundCeil(int256 x, int256 y) internal pure returns (int256) {
-    //     require(y > 0, "roundHalfUp only supports y > 0");
+    //     require(y > 0, "roundCeil only supports y > 0");
     //     if (x <= 0 || x % _WAD == 0) {
     //         return x;
     //     }
@@ -233,6 +239,10 @@ library LibMathUnsigned {
         return _WAD;
     }
 
+    /**
+     * @dev Returns the addition of two unsigned integers, reverting on overflow.
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SafeMath.sol#L26
+     */
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
         require(c >= a, "Unaddition overflow");
@@ -240,6 +250,11 @@ library LibMathUnsigned {
         return c;
     }
 
+    /**
+     * @dev Returns the subtraction of two unsigned integers, reverting with custom message on
+     * overflow (when the result is negative).
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SafeMath.sol#L55
+     */
     function sub(uint256 a, uint256 b) internal pure returns (uint256) {
         require(b <= a, "Unsubtraction overflow");
         uint256 c = a - b;
@@ -247,6 +262,11 @@ library LibMathUnsigned {
         return c;
     }
 
+    /**
+     * @dev Returns the multiplication of two unsigned integers, reverting on
+     * overflow.
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SafeMath.sol#L71
+     */
     function mul(uint256 a, uint256 b) internal pure returns (uint256) {
         // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
         // benefit is lost if 'b' is also tested.
@@ -261,6 +281,11 @@ library LibMathUnsigned {
         return c;
     }
 
+    /**
+     * @dev Returns the integer division of two unsigned integers. Reverts with custom message on
+     * division by zero. The result is rounded towards zero.
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SafeMath.sol#L111
+     */
     function div(uint256 a, uint256 b) internal pure returns (uint256) {
         // Solidity only automatically asserts when dividing by 0
         require(b > 0, "Undivision by zero");
@@ -295,6 +320,11 @@ library LibMathUnsigned {
         return int256(x);
     }
 
+    /**
+     * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
+     * Reverts with custom message when dividing by zero.
+     * see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.1/contracts/math/SafeMath.sol#L146
+     */
     function mod(uint256 x, uint256 m) internal pure returns (uint256) {
         require(m != 0, "mod by zero");
         return x % m;
