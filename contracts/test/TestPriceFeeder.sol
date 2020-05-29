@@ -21,4 +21,12 @@ contract TestPriceFeeder {
         newPrice = latestAnswer.max(0).toUint256();
         timestamp = latestTimestamp;
     }
+
+    function read() public view returns (uint256) {
+        return latestAnswer.max(0).toUint256();
+    }
+
+    function age() public view returns (uint32) {
+        return uint32(latestTimestamp);
+    }
 }

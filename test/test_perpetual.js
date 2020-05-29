@@ -155,7 +155,7 @@ contract('TestPerpetual', accounts => {
             } catch (error) {
                 assert.ok(error.message.includes("invalid side"), error);
             }
-         })
+        })
 
         it('transferCashBalance exceptions', async () => {
             await perpetual.beginGlobalSettlement(toWad(7000));
@@ -165,7 +165,7 @@ contract('TestPerpetual', accounts => {
             } catch (error) {
                 assert.ok(error.message.includes("wrong perpetual status"), error);
             }
-         })
+        })
     });
 
     describe("liquidate", async () => {
@@ -235,7 +235,7 @@ contract('TestPerpetual', accounts => {
                 await perpetual.liquidate(u1, toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
-               assert.ok(error.message.includes("safe account"), error);
+                assert.ok(error.message.includes("safe account"), error);
             }
 
             await funding.setMarkPrice(toWad(5000));
@@ -624,7 +624,7 @@ contract('TestPerpetual', accounts => {
                 assert.ok(error.message.includes("insufficient funds"), error);
             }
             try {
-                await perpetual.depositEtherToInsuranceFund({ value: toWad(10.111)});
+                await perpetual.depositEtherToInsuranceFund({ value: toWad(10.111) });
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("ether not acceptable"), error);
@@ -738,7 +738,7 @@ contract('TestPerpetual', accounts => {
             });
 
             try {
-                await perpetual.depositEther({ value: toWad(1000), from: u1});
+                await perpetual.depositEther({ value: toWad(1000), from: u1 });
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("ether not acceptable"), error);
@@ -982,7 +982,7 @@ contract('TestPerpetual', accounts => {
             }
 
             await perpetual.endGlobalSettlement();
-            await perpetual.settle({from: u1});
+            await perpetual.settle({ from: u1 });
 
             assert.equal(fromWad(await cashBalanceOf(u1)), 0);
             assert.equal(fromWad(await collateral.balanceOf(u1)), 120);
@@ -1236,7 +1236,7 @@ contract('TestPerpetual', accounts => {
             assert.equal(await perpetual.isSafe.call(u1), true);
             assert.equal(await perpetual.isBankrupt.call(u1), false);
 
-            await perpetual.applyForWithdrawal(toWad(10000), {from: u1});
+            await perpetual.applyForWithdrawal(toWad(10000), { from: u1 });
             await increaseBlockBy(5);
             try {
                 await perpetual.withdraw(toWad(700), { from: u1 });

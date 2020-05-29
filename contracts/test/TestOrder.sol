@@ -11,24 +11,24 @@ contract TestOrder {
     using LibOrder for LibOrder.Order;
     using LibSignature for LibSignature.OrderSignature;
 
-    function getOrder(LibOrder.OrderParam memory orderParam, address perpetual, address broker)
-        public
-        pure
-        returns (LibOrder.Order memory order)
-    {
-        order = orderParam.getOrder(perpetual, broker);
+    function getOrder(
+        LibOrder.OrderParam memory orderParam,
+        address perpetual,
+        address broker
+    ) public view returns (LibOrder.Order memory order) {
+        order = orderParam.getOrder(perpetual, address(this), broker);
     }
 
     function hashOrder(LibOrder.Order memory order) public pure returns (bytes32) {
         return order.hashOrder();
     }
 
-    function getOrderHash(LibOrder.OrderParam memory orderParam, address perpetual, address broker)
-        public
-        pure
-        returns (bytes32)
-    {
-        return orderParam.getOrderHash(perpetual, broker);
+    function getOrderHash(
+        LibOrder.OrderParam memory orderParam,
+        address perpetual,
+        address broker
+    ) public view returns (bytes32) {
+        return orderParam.getOrderHash(perpetual, address(this), broker);
     }
 
     function getOrderHash(LibOrder.Order memory order) public pure returns (bytes32) {

@@ -13,7 +13,7 @@ library LibOrder {
 
     bytes32 public constant EIP712_ORDER_TYPE = keccak256(
         abi.encodePacked(
-            "Order(address trader,address broker,address perpetual,uint256 amount,uint256 price,bytes32 data)"
+            "Order(address agent,address trader,address broker,address perpetual,address exchange,uint256 amount,uint256 price,bytes32 data)"
         )
     );
 
@@ -21,9 +21,11 @@ library LibOrder {
     uint256 public constant ONE = 1e18;
 
     struct Order {
+        address agent;
         address trader;
         address broker;
         address perpetual;
+        address exchange;
         uint256 amount;
         uint256 price;
         /**
@@ -48,6 +50,7 @@ library LibOrder {
     }
 
     struct OrderParam {
+        address agent;
         address trader;
         uint256 amount;
         uint256 price;
@@ -57,10 +60,11 @@ library LibOrder {
 
     function getOrderHash(
         OrderParam memory orderParam,
+        address exchange,
         address perpetual,
         address broker
     ) internal pure returns (bytes32 orderHash) {
-        Order memory order = getOrder(orderParam, perpetual, broker);
+        Order memory order = getOrder(orderParam, perpetual, exchange, broker);
         orderHash = LibEIP712.hashEIP712Message(hashOrder(order));
         return orderHash;
     }
@@ -73,14 +77,17 @@ library LibOrder {
     function getOrder(
         OrderParam memory orderParam,
         address perpetual,
+        address exchange,
         address broker
     ) internal pure returns (LibOrder.Order memory order) {
         order.trader = orderParam.trader;
         order.broker = broker;
         order.perpetual = perpetual;
+        order.exchange = exchange;
         order.amount = orderParam.amount;
         order.price = orderParam.price;
         order.data = orderParam.data;
+        order.agent = orderParam.agent;
     }
 
     function hashOrder(Order memory order) internal pure returns (bytes32 result) {
@@ -90,7 +97,7 @@ library LibOrder {
             let start := sub(order, 32)
             let tmp := mload(start)
             mstore(start, orderType)
-            result := keccak256(start, 224)
+            result := keccak256(start, 288)
             mstore(start, tmp)
         }
         return result;

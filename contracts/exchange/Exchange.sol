@@ -4,8 +4,11 @@ pragma experimental ABIEncoderV2; // to enable structure-type parameter
 import "../lib/LibMath.sol";
 import "../lib/LibOrder.sol";
 import "../lib/LibSignature.sol";
+
 import "../interface/IPerpetual.sol";
 import "../interface/IAMM.sol";
+
+import {ExchangeStorage} from "./ExchangeStorage.sol";
 
 
 contract Exchange {
@@ -17,11 +20,6 @@ contract Exchange {
 
     uint256 public constant SUPPORTED_ORDER_VERSION = 2;
 
-    enum OrderStatus {EXPIRED, CANCELLED, FILLABLE, FULLY_FILLED}
-
-    mapping(bytes32 => uint256) public filled;
-    mapping(bytes32 => bool) public cancelled;
-
     event MatchWithOrders(
         address perpetual,
         LibOrder.OrderParam takerOrderParam,
@@ -31,12 +29,20 @@ contract Exchange {
     event MatchWithAMM(address perpetual, LibOrder.OrderParam takerOrderParam, uint256 amount);
     event Cancel(bytes32 indexed orderHash);
 
+    ExchangeStorage stateStorage;
+
+    constructor(address _stateStorage) public {
+        stateStorage = ExchangeStorage(_stateStorage);
+    }
+
     function matchOrders(
         LibOrder.OrderParam memory takerOrderParam,
         LibOrder.OrderParam[] memory makerOrderParams,
         address _perpetual,
         uint256[] memory amounts
     ) public {
+        require(amounts.length == makerOrderParams.length, "ummatched length");
+        require(amounts.length > 0, "invalid length");
         require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
 
         IPerpetual perpetual = IPerpetual(_perpetual);
@@ -44,7 +50,7 @@ contract Exchange {
 
         uint256 tradingLotSize = perpetual.getGovernance().tradingLotSize;
         bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
-        uint256 takerFilledAmount = filled[takerOrderHash];
+        uint256 takerFilledAmount = stateStorage.filled(_perpetual, takerOrderHash);
         uint256 takerOpened;
 
         for (uint256 i = 0; i < makerOrderParams.length; i++) {
@@ -60,7 +66,7 @@ contract Exchange {
             validatePrice(takerOrderParam, makerOrderParams[i]);
 
             bytes32 makerOrderHash = validateOrderParam(perpetual, makerOrderParams[i]);
-            uint256 makerFilledAmount = filled[makerOrderHash];
+            uint256 makerFilledAmount = stateStorage.filled(_perpetual, makerOrderHash);
 
             require(amounts[i] <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
             require(amounts[i] <= makerOrderParams[i].amount.sub(makerFilledAmount), "maker overfilled");
@@ -69,7 +75,7 @@ contract Exchange {
             uint256 opened = fillOrder(perpetual, takerOrderParam, makerOrderParams[i], amounts[i]);
 
             takerOpened = takerOpened.add(opened);
-            filled[makerOrderHash] = makerFilledAmount.add(amounts[i]);
+            stateStorage.setFilled(_perpetual, makerOrderHash, makerFilledAmount.add(amounts[i]));
             takerFilledAmount = takerFilledAmount.add(amounts[i]);
         }
 
@@ -81,7 +87,7 @@ contract Exchange {
         }
         require(perpetual.isSafe(msg.sender), "broker unsafe");
 
-        filled[takerOrderHash] = takerFilledAmount;
+        stateStorage.setFilled(_perpetual, takerOrderHash, takerFilledAmount);
     }
 
     function fillOrder(
@@ -131,7 +137,7 @@ contract Exchange {
         require(amount.mod(perpetual.getGovernance().tradingLotSize) == 0, "invalid trading lot size");
 
         bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
-        uint256 takerFilledAmount = filled[takerOrderHash];
+        uint256 takerFilledAmount = stateStorage.filled(_perpetual, takerOrderHash);
         require(amount <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
 
         // trading with pool
@@ -147,7 +153,7 @@ contract Exchange {
         } else {
             takerOpened = amm.buyFromWhitelisted(takerOrderParam.trader, amount, price, takerOrderParam.getExpiredAt());
         }
-        filled[takerOrderHash] = filled[takerOrderHash].add(amount);
+        stateStorage.setFilled(_perpetual, takerOrderHash, takerFilledAmount.add(amount));
 
         emit MatchWithAMM(_perpetual, takerOrderParam, amount);
     }
@@ -174,11 +180,16 @@ contract Exchange {
         require(orderParam.getOrderVersion() == 2, "unsupported version");
         require(orderParam.getExpiredAt() >= block.timestamp, "order expired");
 
-        bytes32 orderHash = orderParam.getOrderHash(address(perpetual), broker);
-        require(!cancelled[orderHash], "cancelled order");
-        require(orderParam.signature.isValidSignature(orderHash, orderParam.trader), "invalid signature");
-        require(filled[orderHash] < orderParam.amount, "fullfilled order");
+        bytes32 orderHash = orderParam.getOrderHash(address(perpetual), address(this), broker);
+        require(!stateStorage.isCancelled(address(perpetual), orderHash), "cancelled order");
 
+        address signerAddress = orderParam.signature.getSignerAddress(orderHash);
+        if (signerAddress == orderParam.agent) {
+            require(stateStorage.isAgent(address(perpetual), orderParam.trader, orderParam.agent), "invalid agent");
+        } else {
+            require(signerAddress == orderParam.trader, "invalid signature");
+        }
+        require(stateStorage.filled(address(perpetual), orderHash) < orderParam.amount, "fullfilled order");
         return orderHash;
     }
 
@@ -196,10 +207,8 @@ contract Exchange {
 
     function cancelOrder(LibOrder.Order memory order) public {
         require(msg.sender == order.trader || msg.sender == order.broker, "invalid caller");
-
         bytes32 orderHash = order.getOrderHash();
-        cancelled[orderHash] = true;
-
+        stateStorage.setCancelled(order.perpetual, orderHash);
         emit Cancel(orderHash);
     }
 
