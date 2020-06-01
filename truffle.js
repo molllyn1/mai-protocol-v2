@@ -1,7 +1,7 @@
 var PrivateKeyProvider = require('truffle-privatekey-provider');
 
 module.exports = {
-    migrations_directory: "skip_migrations",
+    migrations_directory: "migrations_empty",
     networks: {
         development: {
             host: '127.0.0.1',
