@@ -1,13 +1,11 @@
 const InversedChainlinkAdapter = artifacts.require('oracle/InversedChainlinkAdapter.sol');
-const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const AMM = artifacts.require('liquidity/AMM.sol');
 const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
 
 module.exports = async function (deployer, network, accounts) {
-    // const priceFeeder = await InversedChainlinkAdapter.deployed();
-    const priceFeeder = await PriceFeeder.deployed();
+    const priceFeeder = await InversedChainlinkAdapter.deployed();
     const shareToken = await ShareToken.deployed();
     const perpetual = await Perpetual.deployed();
     const proxy = await Proxy.deployed();
