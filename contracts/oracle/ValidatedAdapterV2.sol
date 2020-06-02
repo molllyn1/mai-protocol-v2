@@ -6,9 +6,16 @@ import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../interface/IPriceFeeder.sol";
 
 
-contract ValidatedAdapterV2 is Ownable {
+contract ValidatedAdapter is Ownable {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
+
+    struct PriceFeederSpec {
+        // call(g, a, v, in, insize, out, outsize)
+        bytes4 priceSelector;
+        bytes4 timestampSelector;
+        uint256 priceDecimals;
+    }
 
     // constants:
     uint256 constant public ONE_PERCENT = 10 ** 16;
@@ -29,8 +36,9 @@ contract ValidatedAdapterV2 is Ownable {
     mapping(address => uint256) private candidateTimeouts;
 
     // events:
-    event AddCandidate(address indexed feeder);
+    event AddCandidate(address indexed feeder, uint256 timeout);
     event RemoveCandidate(address indexed feeder);
+    event UpdateCandidateTimeout(address indexed feeder, uint256 timeout);
     event UpdatePrimary(address indexed oldPrimary, address indexed newPrimary);
     event UpdateMaxPriceGapPercentage(uint256 oldValue, uint256 newValue);
     event UpdatePrice(address indexed primary, uint256 newPrice, uint256 newTimestamp);
@@ -76,6 +84,7 @@ contract ValidatedAdapterV2 is Ownable {
         require(candidates[feeder], "not exist");
 
         candidateTimeouts[feeder] = timeoutSeconds;
+        emit UpdateCandidateTimeout(feeder, timeoutSeconds);
     }
 
     /// @dev Test a address is in candidate list.
@@ -104,8 +113,7 @@ contract ValidatedAdapterV2 is Ownable {
         candidates[feeder] = true;
         candidateTimeouts[feeder] = timeoutSeconds;
         candidateList.push(feeder);
-
-        emit AddCandidate(feeder);
+        emit AddCandidate(feeder, timeoutSeconds);
     }
 
     /// @dev Remove a feeder from candidate list.
@@ -126,23 +134,21 @@ contract ValidatedAdapterV2 is Ownable {
         emit RemoveCandidate(feeder);
     }
 
-    /// @dev Read latest price and timestamp. It will try to update price if the current price is timeout.
-    ///      Usually, the price will be update by another keeper to reduce gas cost of caller.
+    /// @dev Read latest price and timestamp. It will try to update  if the current price is changed.
     /// @return Latest price and timestamp.
-    function price() public primaryRequired returns (uint256 newPrice, uint256 timestamp) {
-        require(lastPrice > 0 && lastTimestamp > 0, "no value");
-        if (!isValidTimestamp(primary, lastTimestamp)) {
-            updatePrice();
-        }
-        newPrice = lastPrice;
-        timestamp = lastTimestamp;
+    function price() public primaryRequired returns (uint256, uint256) {
+        updatePrice();
+        return (lastPrice, lastTimestamp);
     }
 
     /// @dev Update price from primary feeder and validate the price read with prices from validators (candidates).
     ///      This method is usually called by a keeper but also can be called by anyone if needed.
-    function updatePrice() public primaryRequired returns (bool) {
+    function updatePrice() public primaryRequired {
         (uint256 newPrice, uint256 newTimestamp) = IPriceFeeder(primary).price();
-        if (newPrice != lastPrice || lastTimestamp != newTimestamp) {
+        require(newPrice > 0 && newTimestamp > 0, "no value");
+        require(isValidTimestamp(primary, newTimestamp), "outdated price");
+
+        if (newPrice != lastPrice || newTimestamp != lastTimestamp) {
             require(newPrice > 0, "invalid price");
             require(isValidTimestamp(primary, newTimestamp), "timestamp out of range");
             require(isValidatePrice(newPrice), "price gap reached");
@@ -150,9 +156,7 @@ contract ValidatedAdapterV2 is Ownable {
             lastPrice = newPrice;
             lastTimestamp = newTimestamp;
             emit UpdatePrice(primary, newPrice, newTimestamp);
-            return true;
         }
-        return false;
     }
 
     /// @dev calculate abs(diff(a, b))

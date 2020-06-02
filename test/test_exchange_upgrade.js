@@ -22,6 +22,7 @@ const TestFundingMock = artifacts.require('test/TestFundingMock.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
+const ExchangeStorage = artifacts.require('exchange/ExchangeStorage.sol');
 
 contract('exchange-user', accounts => {
     const FLAT = 0;
@@ -33,6 +34,7 @@ contract('exchange-user', accounts => {
     let funding;
     let perpetual;
     let exchange;
+    let exchangeStorage;
 
     const broker = accounts[9];
     const admin = accounts[0];
@@ -62,7 +64,8 @@ contract('exchange-user', accounts => {
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
         global = await GlobalConfig.new();
         funding = await TestFundingMock.new();
-        exchange = await Exchange.new();
+        exchangeStorage = await ExchangeStorage.new();
+        exchange = await Exchange.new(exchangeStorage.address);
         perpetual = await Perpetual.new(
             global.address,
             dev,

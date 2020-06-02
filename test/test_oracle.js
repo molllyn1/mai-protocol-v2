@@ -23,6 +23,9 @@ const toCL = (...xs) => {
 
 contract('oracle', accounts => {
 
+    const admin = accounts[0];
+    const u1 = accounts[1];
+
     const sleep = (ms) => {
         return new Promise((resolve) => {
           setTimeout(resolve, ms);
@@ -33,13 +36,78 @@ contract('oracle', accounts => {
         return Math.round(new Date().getTime() / 1000);
     }
 
+    it("test feeder", async () => {
+        let simMakerMedian = await TestPriceFeeder.new();
+        let makerMedianAdapter = await MakerMedianAdapter.new(simMakerMedian.address, 18, 10);
+
+        try {
+            await makerMedianAdapter.price();
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("not whitelisted"))
+        }
+
+        simMakerMedian.setPrice(toWad(6000));
+        makerMedianAdapter.addWhitelisted(admin);
+        var {newPrice, newTimestamp} = await makerMedianAdapter.price();
+        assert.equal(newPrice, toWad(6000));
+
+        try {
+            await makerMedianAdapter.price({from: u1});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("not whitelisted"))
+        }
+
+        try {
+            await makerMedianAdapter.addWhitelisted(u1, {from: u1});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("not the owner"))
+        }
+        console.log(await makerMedianAdapter.allWhitelisted())
+    })
+
+    it("ValidatedAdapterV2 estimate gas", async () => {
+        let simChainlink = await TestPriceFeeder.new();
+        let simMakerMedian = await TestPriceFeeder.new();
+        let chainlinkAdapter = await ChainlinkAdapter.new(simChainlink.address);
+        let makerMedianAdapter = await MakerMedianAdapter.new(simMakerMedian.address, 18, 10);
+        let adapter = await ValidatedAdapterV2.new(3);
+        await makerMedianAdapter.addWhitelisted(adapter.address);
+
+
+        await adapter.addCandidate(chainlinkAdapter.address, 5);
+        await adapter.addCandidate(makerMedianAdapter.address, 5);
+        await adapter.setPrimary(chainlinkAdapter.address);
+
+        await simChainlink.setPrice(toCL(7000));
+        await simMakerMedian.setPrice(toWad(7000));
+
+        var tx = await adapter.updatePrice();
+        console.log("initial:", tx.receipt.gasUsed);
+
+        await simChainlink.setPrice(toCL(7001));
+        await simMakerMedian.setPrice(toWad(7001));
+        tx = await adapter.updatePrice();
+        console.log("daily:", tx.receipt.gasUsed);
+
+        tx = await adapter.updatePrice();
+        console.log("no update:", tx.receipt.gasUsed);
+
+        // tx = await adapter.price();
+        // console.log("read:", tx.receipt.gasUsed);
+    });
+
     it("ValidatedAdapterV2 timeouts", async () => {
         let simChainlink = await TestPriceFeeder.new();
         let simMakerMedian = await TestPriceFeeder.new();
         let chainlinkAdapter = await ChainlinkAdapter.new(simChainlink.address);
-        let makerMedianAdapter = await MakerMedianAdapter.new(simMakerMedian.address);
+        let makerMedianAdapter = await MakerMedianAdapter.new(simMakerMedian.address, 18, 10);
 
         let adapter = await ValidatedAdapterV2.new(3);
+        await makerMedianAdapter.addWhitelisted(adapter.address);
+
         await adapter.addCandidate(chainlinkAdapter.address, 5);
         await adapter.addCandidate(makerMedianAdapter.address, 5);
         await adapter.setPrimary(chainlinkAdapter.address);
@@ -83,8 +151,6 @@ contract('oracle', accounts => {
         assert.equal(newPrice, toWad(7001));
 
     });
-
-    return;
 
     it("ValidatedAdapterV2 exceptions", async () => {
         let A = await TestPriceFeeder.new();
@@ -147,9 +213,11 @@ contract('oracle', accounts => {
         let simMakerMedian = await TestPriceFeeder.new();
 
         let chainlinkAdapter = await ChainlinkAdapter.new(simChainlink.address);
-        let makerMedianAdapter = await MakerMedianAdapter.new(simMakerMedian.address);
+        let makerMedianAdapter = await MakerMedianAdapter.new(simMakerMedian.address, 18, 10);
 
         let adapter = await ValidatedAdapterV2.new(3);
+        await makerMedianAdapter.addWhitelisted(adapter.address);
+
         assert.ok(!(await adapter.isCandidate(chainlinkAdapter.address)));
         assert.ok(!(await adapter.isCandidate(makerMedianAdapter.address)));
 
@@ -185,12 +253,12 @@ contract('oracle', accounts => {
         await adapter.setPrimary(chainlinkAdapter.address);
         assert.equal(await adapter.primary(), chainlinkAdapter.address);
 
-        try {
-            var { newPrice, timestamp } = await adapter.price.call();
-            throw null;
-        } catch (error) {
-            assert.ok(error.message.includes("no value"));
-        }
+        // try {
+        //     var { newPrice, timestamp } = await adapter.price.call();
+        //     throw null;
+        // } catch (error) {
+        //     assert.ok(error.message.includes("no value"));
+        // }
 
         // cl: 7000 - now
         // mm: 0 - 0'
@@ -258,103 +326,6 @@ contract('oracle', accounts => {
         }
         await adapter.removeCandidate(makerMedianAdapter.address);
         await adapter.updatePrice();
-        var { newPrice, timestamp } = await adapter.price.call();
-        assert.equal(newPrice, toWad(7000));
-    });
-
-    return;
-
-    it("ValidatedAdapter", async () => {
-        let simChainlink = await TestPriceFeeder.new();
-        let simMakerMedian = await TestPriceFeeder.new();
-
-        let chainlinkAdapter = await ChainlinkAdapter.new(simChainlink.address);
-        let makerMedianAdapter = await MakerMedianAdapter.new(simMakerMedian.address);
-        let adapter = await ValidatedAdapter.new(chainlinkAdapter.address, 10);
-
-        assert.ok(await adapter.isCandidate(chainlinkAdapter.address));
-        assert.ok(!(await adapter.isCandidate(makerMedianAdapter.address)));
-
-        await adapter.addCandidate(makerMedianAdapter.address);
-
-        try {
-            await adapter.addCandidate(makerMedianAdapter.address);
-            throw null;
-        } catch (error) {
-            assert.ok(error.message.includes("already added"));
-        }
-
-        assert.ok(await adapter.isCandidate(chainlinkAdapter.address));
-        assert.ok(await adapter.isCandidate(makerMedianAdapter.address));
-
-        // cl: 0 - 0
-        // mm: 0 - 0
-        try {
-            var { newPrice, timestamp } = await adapter.price.call();
-            throw null;
-        } catch (error) {
-            assert.ok(error.message.includes("invalid target price"));
-        }
-
-        // cl: 7000 - now
-        // mm: 0 - 0'
-        await simChainlink.setPrice(toCL(7000));
-        var { newPrice, timestamp } = await adapter.price.call();
-        assert.equal(newPrice, toWad(7000));
-
-        // cl: 7000 - now
-        // mm: 0 - now'
-        await simChainlink.setPrice(toCL(7000));
-        await simMakerMedian.setPrice(toWad(1));
-        try {
-            var { newPrice, timestamp } = await adapter.price.call();
-            throw null;
-        } catch (error) {
-            assert.ok(error.message.includes("intolerant price"));
-        }
-
-        // cl: 7000 - now
-        // mm: 0 - now'
-        await simChainlink.setPrice(toCL(1000));
-        await simMakerMedian.setPrice(toWad(951));
-        var { newPrice, timestamp } = await adapter.price.call();
-        assert.equal(newPrice, toWad(1000));
-
-        await simChainlink.setPrice(toCL(950));
-        await simMakerMedian.setPrice(toWad(1));
-        try {
-            var { newPrice, timestamp } = await adapter.price.call();
-            throw null;
-        } catch (error) {
-            assert.ok(error.message.includes("intolerant price"));
-        }
-
-        await adapter.setPriceBiasTolerance(toWad(0.051));
-        await simChainlink.setPrice(toCL(1000));
-        await simMakerMedian.setPrice(toWad(950));
-        var { newPrice, timestamp } = await adapter.price.call();
-        assert.equal(newPrice, toWad(1000));
-        await adapter.setPriceBiasTolerance(toWad(0.05));
-
-
-        await simChainlink.setPrice(toCL(1000));
-        var ts = await simChainlink.latestTimestamp();
-        await simMakerMedian.setPriceAndTimestamp(toWad(950), ts - 3601);
-        var { newPrice, timestamp } = await adapter.price.call();
-        assert.equal(newPrice, toWad(1000));
-
-
-        // cl: 7000 - now
-        // mm: 0 - now'
-        await simChainlink.setPrice(toCL(7000));
-        await simMakerMedian.setPrice(toWad(1));
-        try {
-            var { newPrice, timestamp } = await adapter.price.call();
-            throw null;
-        } catch (error) {
-            assert.ok(error.message.includes("intolerant price"));
-        }
-        await adapter.removeCandidate(makerMedianAdapter.address);
         var { newPrice, timestamp } = await adapter.price.call();
         assert.equal(newPrice, toWad(7000));
     });

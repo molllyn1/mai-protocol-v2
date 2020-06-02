@@ -18,6 +18,7 @@ const {
 } = require('./order');
 
 const Exchange = artifacts.require("exchange/Exchange.sol");
+const ExchangeStorage = artifacts.require('exchange/ExchangeStorage.sol');
 const TestToken = artifacts.require('test/TestToken.sol');
 const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
@@ -36,6 +37,7 @@ contract('exchange-amm', accounts => {
     let funding;
     let perpetual;
     let exchange;
+    let exchangeStorage;
     let share;
 
     const broker = accounts[9];
@@ -63,7 +65,8 @@ contract('exchange-amm', accounts => {
     };
 
     const deploy = async () => {
-        exchange = await Exchange.new();
+        exchangeStorage = await ExchangeStorage.new();
+        exchange = await Exchange.new(exchangeStorage.address);
         priceFeeder = await PriceFeeder.new();
         share = await ShareToken.new("ST", "STK", 18);
         collateral = await TestToken.new("TT", "TestToken", 18);

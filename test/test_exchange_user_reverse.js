@@ -8,6 +8,7 @@ const TestFundingMock = artifacts.require('test/TestFundingMock.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
+const ExchangeStorage = artifacts.require('exchange/ExchangeStorage.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
 const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
@@ -24,6 +25,7 @@ contract('exchange-user-reverse', accounts => {
     let funding;
     let perpetual;
     let exchange;
+    let exchangeStorage;
     let proxy;
     let amm;
     let share;
@@ -57,7 +59,8 @@ contract('exchange-user-reverse', accounts => {
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
         global = await GlobalConfig.new();
         funding = await TestFundingMock.new();
-        exchange = await Exchange.new();
+        exchangeStorage = await ExchangeStorage.new();
+        exchange = await Exchange.new(exchangeStorage.address);
         perpetual = await Perpetual.new(
             global.address,
             dev,
