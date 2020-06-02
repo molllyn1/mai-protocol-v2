@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../interface/IChainlinkFeeder.sol";
@@ -15,7 +15,7 @@ contract ChainlinkAdapter {
     }
 
     function price() public view returns (uint256 newPrice, uint256 timestamp) {
-        newPrice = (feeder.latestAnswer() * chainlinkDecimalsAdapter).toUint256();
+        newPrice = (feeder.latestAnswer().mul(chainlinkDecimalsAdapter)).toUint256();
         timestamp = feeder.latestTimestamp();
     }
 }

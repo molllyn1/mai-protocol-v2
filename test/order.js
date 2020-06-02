@@ -81,7 +81,7 @@ const generateOrderData = (
 
 const EIP712_DOMAIN_TYPEHASH = sha3ToHex('EIP712Domain(string name)');
 const EIP712_ORDER_TYPE = sha3ToHex(
-    "Order(address trader,address broker,address perpetual,uint256 amount,uint256 price,bytes32 data)"
+    "Order(uint256 chainId,address perpetual,address broker,address trader,uint256 amount,uint256 price,bytes32 data)"
 );
 
 const getDomainSeparator = () => {
@@ -98,9 +98,10 @@ const getOrderHash = order => {
     return getEIP712MessageHash(
         sha3ToHex(
             EIP712_ORDER_TYPE +
-            addLeadingZero(order.trader.slice(2), 64) +
-            addLeadingZero(order.broker.slice(2), 64) +
+            addLeadingZero(new BigNumber(order.chainId).toString(16), 64) +
             addLeadingZero(order.perpetual.slice(2), 64) +
+            addLeadingZero(order.broker.slice(2), 64) +
+            addLeadingZero(order.trader.slice(2), 64) +
             addLeadingZero(new BigNumber(order.amount).toString(16), 64) +
             addLeadingZero(new BigNumber(order.price).toString(16), 64) +
             order.data.slice(2)
@@ -137,11 +138,13 @@ const getExpiredAt = orderParam => {
 };
 
 const buildOrder = async (orderParam, perpetual, broker) => {
-
+    // const chainId = await web3.eth.net.getId()
+    const chainId = 1; // according to a bug reported in ganache-core, chainid() will always return 1;
     const order = {
-        trader: orderParam.trader,
-        broker: broker,
+        chainId: orderParam.chainId || chainId,
         perpetual: perpetual,
+        broker: broker,
+        trader: orderParam.trader,
         amount: toWad(orderParam.amount),
         price: toWad(orderParam.price),
         data: generateOrderData(
@@ -162,10 +165,12 @@ const buildOrder = async (orderParam, perpetual, broker) => {
 
 const buildOrderEx = async (orderParam, perpetual, broker) => {
     const now = Date.parse(new Date()) / 1000;
+    const chainId = await web3.eth.net.getId()
     const order = {
         trader: orderParam.trader,
         broker: broker,
         perpetual: perpetual,
+        chainId: orderParam.chainId || chainId,
         amount: toWad(orderParam.amount),
         price: toWad(orderParam.price),
         data: generateOrderData(
@@ -180,7 +185,6 @@ const buildOrderEx = async (orderParam, perpetual, broker) => {
         ),
     };
     await getOrderSignature(order);
-    console.log(order);
     return order;
 };
 

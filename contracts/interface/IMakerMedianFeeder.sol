@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 
 
 // see https://github.com/makerdao/median/blob/master/src/median.sol

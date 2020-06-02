@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibOrder.sol";
@@ -13,27 +13,26 @@ contract TestOrder {
 
     function getOrder(
         LibOrder.OrderParam memory orderParam,
-        address perpetual,
-        address broker
-    ) public view returns (LibOrder.Order memory order) {
-        order = orderParam.getOrder(perpetual, address(this), broker);
+        LibOrder.OrderContext memory orderContext
+    ) public pure returns (LibOrder.Order memory order) {
+        order = orderParam.getOrder(orderContext);
     }
 
     function hashOrder(LibOrder.Order memory order) public pure returns (bytes32) {
         return order.hashOrder();
     }
 
-    function getOrderHash(
-        LibOrder.OrderParam memory orderParam,
-        address perpetual,
-        address broker
-    ) public view returns (bytes32) {
-        return orderParam.getOrderHash(perpetual, address(this), broker);
-    }
-
-    function getOrderHash(LibOrder.Order memory order) public pure returns (bytes32) {
+    function getOrderHash1(LibOrder.Order memory order) public pure returns (bytes32) {
         return order.getOrderHash();
     }
+
+    function getOrderHash2(
+        LibOrder.OrderParam memory orderParam,
+        LibOrder.OrderContext memory orderContext
+    ) public pure returns (bytes32) {
+        return orderParam.getOrderHash(orderContext);
+    }
+
 
     function getOrderExpiredAt(LibOrder.OrderParam memory orderParam) public pure returns (uint256) {
         return orderParam.getExpiredAt();

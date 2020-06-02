@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibMath.sol";
@@ -170,26 +170,42 @@ contract Exchange {
         require(takerOrderParam.isSell() ? takerPrice <= makerPrice : takerPrice >= makerPrice, "price not match");
     }
 
+    function test() public view returns (uint256) {
+        uint256 id;
+        assembly {
+            id := chainid()
+        }
+        return id;
+    }
+
+    function getOrderContext(address _perpetual) internal view returns (LibOrder.OrderContext memory orderContext) {
+        uint256 id;
+        assembly {
+            id := chainid()
+        }
+        orderContext = LibOrder.OrderContext({
+            chainId: id,
+            perpetual: _perpetual,
+            broker: msg.sender
+        });
+    }
+
     function validateOrderParam(IPerpetual perpetual, LibOrder.OrderParam memory orderParam)
         internal
         view
         returns (bytes32)
     {
-        address broker = perpetual.currentBroker(orderParam.trader);
-        require(broker == msg.sender, "invalid broker");
+        LibOrder.OrderContext memory orderContext = getOrderContext(address(perpetual));
+        require(perpetual.currentBroker(orderParam.trader) == orderContext.broker, "invalid broker");
         require(orderParam.getOrderVersion() == 2, "unsupported version");
         require(orderParam.getExpiredAt() >= block.timestamp, "order expired");
 
-        bytes32 orderHash = orderParam.getOrderHash(address(perpetual), address(this), broker);
+        bytes32 orderHash = orderParam.getOrderHash(orderContext);
         require(!stateStorage.isCancelled(address(perpetual), orderHash), "cancelled order");
+        require(stateStorage.filled(address(perpetual), orderHash) < orderParam.amount, "fullfilled order");
 
         address signerAddress = orderParam.signature.getSignerAddress(orderHash);
-        if (signerAddress == orderParam.agent) {
-            require(stateStorage.isAgent(address(perpetual), orderParam.trader, orderParam.agent), "invalid agent");
-        } else {
-            require(signerAddress == orderParam.trader, "invalid signature");
-        }
-        require(stateStorage.filled(address(perpetual), orderHash) < orderParam.amount, "fullfilled order");
+        require(signerAddress == orderParam.trader || stateStorage.isAgent(address(perpetual), orderParam.trader, signerAddress), "invalid signer");
         return orderHash;
     }
 

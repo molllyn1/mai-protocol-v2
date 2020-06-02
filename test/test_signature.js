@@ -222,9 +222,9 @@ contract('signature', accounts => {
             data: orderA.data,
             signature: orderA.signature,
         }
-        const orderB = await testOrder.getOrder(orderParam, perpetualAddress, admin);
+        const orderB = await testOrder.getOrder(orderParam, { perpetual: perpetualAddress, broker: admin, chainId: 1}, {from: admin});
         const orderHashA = getOrderHash(orderA);
-        const orderHashB = await testOrder.getOrderHash(orderB);
+        const orderHashB = await testOrder.getOrderHash1(orderB);
         assert.equal(orderHashA, orderHashB);
         assert.ok(await testOrder.isValidSignature(orderParam, orderHashA));
         assert.ok(await testOrder.isValidSignature(orderParam, orderHashB));
@@ -251,8 +251,8 @@ contract('signature', accounts => {
             data: orderA.data,
             signature: orderA.signature,
         }
-        const orderB = await testOrder.getOrder(orderParam, perpetualAddress, u1);
-        const orderHashB = await testOrder.getOrderHash(orderB);
+        const orderB = await testOrder.getOrder(orderParam, { perpetual: perpetualAddress, broker: u1, chainId: 1}, {from: admin});
+        const orderHashB = await testOrder.getOrderHash1(orderB);
 
         assert.ok(await testOrder.isValidSignature(orderParam, orderHashA));
         assert.ok(!(await testOrder.isValidSignature(orderParam, orderHashB)));

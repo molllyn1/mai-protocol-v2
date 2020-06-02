@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 pragma experimental ABIEncoderV2; // to enable structure-type parameters
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";

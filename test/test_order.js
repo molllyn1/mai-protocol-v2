@@ -57,19 +57,29 @@ contract('order', accounts => {
             data: offline.data,
             signature: offline.signature,
         };
-        const orderHash = await testOrder.getOrderHash(await testOrder.getOrder(orderParam, perpetualAddress, admin));
+        // const chainId = await web3.eth.net.getId()
+        const chainId = 1;
+        const orderContext = {
+            perpetual: perpetualAddress,
+            broker: admin,
+            chainId: chainId
+        }
+        const order = await testOrder.getOrder(orderParam, orderContext, { from: admin });
+        const orderHash = await testOrder.getOrderHash1(order);
+
+
 
         assert.equal(getOrderHash(offline), orderHash);
-        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, {from:admin}), 1589366656);
-        assert.equal(await testOrder.isSell.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.getPrice.call(orderParam, {from:admin}), toWad(6000));
-        assert.equal(await testOrder.isMarketOrder.call(orderParam, {from:admin}), true);
-        assert.equal(await testOrder.isMarketBuy.call(orderParam, {from:admin}), true);
-        assert.equal(await testOrder.isMakerOnly.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.isInversed.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.side.call(orderParam, {from:admin}), 2);
-        assert.equal(await testOrder.makerFeeRate.call(orderParam, {from:admin}), 0);
-        assert.equal(await testOrder.takerFeeRate.call(orderParam, {from:admin}), 0);
+        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, { from: admin }), 1589366656);
+        assert.equal(await testOrder.isSell.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.getPrice.call(orderParam, { from: admin }), toWad(6000));
+        assert.equal(await testOrder.isMarketOrder.call(orderParam, { from: admin }), true);
+        assert.equal(await testOrder.isMarketBuy.call(orderParam, { from: admin }), true);
+        assert.equal(await testOrder.isMakerOnly.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.isInversed.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.side.call(orderParam, { from: admin }), 2);
+        assert.equal(await testOrder.makerFeeRate.call(orderParam, { from: admin }), 0);
+        assert.equal(await testOrder.takerFeeRate.call(orderParam, { from: admin }), 0);
     });
 
     it("test order 2", async () => {
@@ -89,6 +99,13 @@ contract('order', accounts => {
             takerFeeRate: 20
         }, perpetualAddress, admin);
 
+        // const chainId = await web3.eth.net.getId()
+        const chainId = 1;
+        const orderContext = {
+            perpetual: perpetualAddress,
+            broker: admin,
+            chainId: chainId
+        }
         const orderParam = {
             trader: trader,
             amount: toWad(1),
@@ -96,19 +113,20 @@ contract('order', accounts => {
             data: offline.data,
             signature: offline.signature,
         };
-        const orderHash = await testOrder.getOrderHash(await testOrder.getOrder(orderParam, perpetualAddress, admin));
+        const order = await testOrder.getOrder(orderParam, orderContext, { from: admin });
+        const orderHash = await testOrder.getOrderHash1(order);
 
         assert.equal(getOrderHash(offline), orderHash);
-        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, {from:admin}), 1589366657);
-        assert.equal(await testOrder.isSell.call(orderParam, {from:admin}), true);
-        assert.equal(await testOrder.getPrice.call(orderParam, {from:admin}), toWad(6000));
-        assert.equal(await testOrder.isMarketOrder.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.isMarketBuy.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.isMakerOnly.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.isInversed.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.side.call(orderParam, {from:admin}), 1);
-        assert.equal((await testOrder.makerFeeRate.call(orderParam, {from:admin})).toString(), toWad(-0.00015));
-        assert.equal((await testOrder.takerFeeRate.call(orderParam, {from:admin})).toString(), toWad(0.0002));
+        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, { from: admin }), 1589366657);
+        assert.equal(await testOrder.isSell.call(orderParam, { from: admin }), true);
+        assert.equal(await testOrder.getPrice.call(orderParam, { from: admin }), toWad(6000));
+        assert.equal(await testOrder.isMarketOrder.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.isMarketBuy.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.isMakerOnly.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.isInversed.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.side.call(orderParam, { from: admin }), 1);
+        assert.equal((await testOrder.makerFeeRate.call(orderParam, { from: admin })).toString(), toWad(-0.00015));
+        assert.equal((await testOrder.takerFeeRate.call(orderParam, { from: admin })).toString(), toWad(0.0002));
     });
 
     it("test order 3", async () => {
@@ -129,6 +147,13 @@ contract('order', accounts => {
             inversed: true,
         }, perpetualAddress, admin);
 
+        // const chainId = await web3.eth.net.getId()
+        const chainId = 1;
+        const orderContext = {
+            perpetual: perpetualAddress,
+            broker: admin,
+            chainId: chainId
+        }
         const orderParam = {
             trader: trader,
             amount: toWad(1),
@@ -136,19 +161,20 @@ contract('order', accounts => {
             data: offline.data,
             signature: offline.signature,
         };
-        const orderHash = await testOrder.getOrderHash(await testOrder.getOrder(orderParam, perpetualAddress, admin));
+        const order = await testOrder.getOrder(orderParam, orderContext, { from: admin });
+        const orderHash = await testOrder.getOrderHash1(order);
 
         assert.equal(getOrderHash(offline), orderHash);
-        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, {from:admin}), 1589366657);
-        assert.equal(await testOrder.isSell.call(orderParam, {from:admin}), false);
-        assert.equal((await testOrder.getPrice.call(orderParam, {from:admin})).toString(), "166666666666667");
-        assert.equal(await testOrder.isMarketOrder.call(orderParam, {from:admin}), true);
-        assert.equal(await testOrder.isMarketBuy.call(orderParam, {from:admin}), true);
-        assert.equal(await testOrder.isMakerOnly.call(orderParam, {from:admin}), false);
-        assert.equal(await testOrder.isInversed.call(orderParam, {from:admin}), true);
-        assert.equal(await testOrder.side.call(orderParam, {from:admin}), 2);
-        assert.equal((await testOrder.makerFeeRate.call(orderParam, {from:admin})).toString(), toWad(-0.00015));
-        assert.equal((await testOrder.takerFeeRate.call(orderParam, {from:admin})).toString(), toWad(0.0002));
+        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, { from: admin }), 1589366657);
+        assert.equal(await testOrder.isSell.call(orderParam, { from: admin }), false);
+        assert.equal((await testOrder.getPrice.call(orderParam, { from: admin })).toString(), "166666666666667");
+        assert.equal(await testOrder.isMarketOrder.call(orderParam, { from: admin }), true);
+        assert.equal(await testOrder.isMarketBuy.call(orderParam, { from: admin }), true);
+        assert.equal(await testOrder.isMakerOnly.call(orderParam, { from: admin }), false);
+        assert.equal(await testOrder.isInversed.call(orderParam, { from: admin }), true);
+        assert.equal(await testOrder.side.call(orderParam, { from: admin }), 2);
+        assert.equal((await testOrder.makerFeeRate.call(orderParam, { from: admin })).toString(), toWad(-0.00015));
+        assert.equal((await testOrder.takerFeeRate.call(orderParam, { from: admin })).toString(), toWad(0.0002));
     });
 
     it("test order 3", async () => {

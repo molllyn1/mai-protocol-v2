@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "./LibEIP712.sol";
@@ -13,7 +13,7 @@ library LibOrder {
 
     bytes32 public constant EIP712_ORDER_TYPE = keccak256(
         abi.encodePacked(
-            "Order(address agent,address trader,address broker,address perpetual,address exchange,uint256 amount,uint256 price,bytes32 data)"
+            "Order(uint256 chainId,address perpetual,address broker,address trader,uint256 amount,uint256 price,bytes32 data)"
         )
     );
 
@@ -21,11 +21,11 @@ library LibOrder {
     uint256 public constant ONE = 1e18;
 
     struct Order {
-        address agent;
-        address trader;
-        address broker;
+        uint256 chainId;
         address perpetual;
-        address exchange;
+        address broker;
+
+        address trader;
         uint256 amount;
         uint256 price;
         /**
@@ -50,7 +50,6 @@ library LibOrder {
     }
 
     struct OrderParam {
-        address agent;
         address trader;
         uint256 amount;
         uint256 price;
@@ -58,13 +57,17 @@ library LibOrder {
         LibSignature.OrderSignature signature;
     }
 
+    struct OrderContext {
+        address perpetual;
+        address broker;
+        uint256 chainId;
+    }
+
     function getOrderHash(
         OrderParam memory orderParam,
-        address exchange,
-        address perpetual,
-        address broker
+        OrderContext memory orderContext
     ) internal pure returns (bytes32 orderHash) {
-        Order memory order = getOrder(orderParam, perpetual, exchange, broker);
+        Order memory order = getOrder(orderParam, orderContext);
         orderHash = LibEIP712.hashEIP712Message(hashOrder(order));
         return orderHash;
     }
@@ -76,18 +79,16 @@ library LibOrder {
 
     function getOrder(
         OrderParam memory orderParam,
-        address perpetual,
-        address exchange,
-        address broker
+        OrderContext memory orderContext
     ) internal pure returns (LibOrder.Order memory order) {
+        order.chainId = orderContext.chainId;
+        order.perpetual = orderContext.perpetual;
+        order.broker = orderContext.broker;
+
         order.trader = orderParam.trader;
-        order.broker = broker;
-        order.perpetual = perpetual;
-        order.exchange = exchange;
         order.amount = orderParam.amount;
         order.price = orderParam.price;
         order.data = orderParam.data;
-        order.agent = orderParam.agent;
     }
 
     function hashOrder(Order memory order) internal pure returns (bytes32 result) {
@@ -97,7 +98,7 @@ library LibOrder {
             let start := sub(order, 32)
             let tmp := mload(start)
             mstore(start, orderType)
-            result := keccak256(start, 288)
+            result := keccak256(start, 256)
             mstore(start, tmp)
         }
         return result;
@@ -112,7 +113,7 @@ library LibOrder {
     }
 
     function isSell(OrderParam memory orderParam) internal pure returns (bool) {
-        bool sell = uint8(orderParam.data[1]) == 1;
+        bool sell = uint8(orderParam.data[1]) > 0;
         return isInversed(orderParam) ? !sell : sell;
     }
 
@@ -121,7 +122,7 @@ library LibOrder {
     }
 
     function isMarketOrder(OrderParam memory orderParam) internal pure returns (bool) {
-        return uint8(orderParam.data[2]) == 1;
+        return uint8(orderParam.data[2]) > 0;
     }
 
     function isMarketBuy(OrderParam memory orderParam) internal pure returns (bool) {
@@ -129,11 +130,11 @@ library LibOrder {
     }
 
     function isMakerOnly(OrderParam memory orderParam) internal pure returns (bool) {
-        return uint8(orderParam.data[22]) == 1;
+        return uint8(orderParam.data[22]) > 0;
     }
 
     function isInversed(OrderParam memory orderParam) internal pure returns (bool) {
-        return uint8(orderParam.data[23]) == 1;
+        return uint8(orderParam.data[23]) > 0;
     }
 
     function side(OrderParam memory orderParam) internal pure returns (LibTypes.Side) {

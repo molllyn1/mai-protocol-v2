@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -31,10 +31,12 @@ contract Perpetual is Brokerage, Position {
     event Liquidate(address indexed keeper, address indexed guy, uint256 price, uint256 amount);
     event EndGlobalSettlement();
 
-    constructor(address globalConfig, address devAddress, address collateral, uint256 collateralDecimals)
-        public
-        Position(collateral, collateralDecimals)
-    {
+    constructor(
+        address globalConfig,
+        address devAddress,
+        address collateral,
+        uint256 collateralDecimals
+    ) public Position(collateral, collateralDecimals) {
         setGovernanceAddress("globalConfig", globalConfig);
         setGovernanceAddress("dev", devAddress);
         emit CreatePerpetual();
@@ -267,7 +269,11 @@ contract Perpetual is Brokerage, Position {
         return availableMarginWithPrice(guy, currentMarkPrice) >= 0;
     }
 
-    function liquidateFrom(address from, address guy, uint256 maxAmount) public returns (uint256, uint256) {
+    function liquidateFrom(
+        address from,
+        address guy,
+        uint256 maxAmount
+    ) public returns (uint256, uint256) {
         require(maxAmount.mod(governance.lotSize) == 0, "invalid lot size");
         require(!isSafe(guy), "safe account");
 
@@ -293,11 +299,12 @@ contract Perpetual is Brokerage, Position {
         return liquidateFrom(msg.sender, guy, maxAmount);
     }
 
-    function tradePosition(address trader, LibTypes.Side side, uint256 price, uint256 amount)
-        public
-        onlyWhitelisted
-        returns (uint256)
-    {
+    function tradePosition(
+        address trader,
+        LibTypes.Side side,
+        uint256 price,
+        uint256 amount
+    ) public onlyWhitelisted returns (uint256) {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
 
@@ -310,7 +317,11 @@ contract Perpetual is Brokerage, Position {
         return opened;
     }
 
-    function transferCashBalance(address from, address to, uint256 amount) public onlyWhitelisted {
+    function transferCashBalance(
+        address from,
+        address to,
+        uint256 amount
+    ) public onlyWhitelisted {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         transferBalance(from, to, amount.toInt256());
     }

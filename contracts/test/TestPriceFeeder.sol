@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.17;
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 
@@ -15,6 +15,11 @@ contract TestPriceFeeder {
 
         // solium-disable-next-line security/no-block-members
         latestTimestamp = block.timestamp;
+    }
+
+    function setPriceAndTimestamp(int256 newPrice, uint256 timestamp) public {
+        latestAnswer = newPrice;
+        latestTimestamp = timestamp;
     }
 
     function price() public view returns (uint256 newPrice, uint256 timestamp) {

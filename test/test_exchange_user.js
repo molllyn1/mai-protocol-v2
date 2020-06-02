@@ -22,6 +22,7 @@ const TestFundingMock = artifacts.require('test/TestFundingMock.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
+const ExchangeStorage = artifacts.require('exchange/ExchangeStorage.sol');
 
 contract('exchange-user', accounts => {
     const FLAT = 0;
@@ -33,6 +34,7 @@ contract('exchange-user', accounts => {
     let funding;
     let perpetual;
     let exchange;
+    let exchangeStorage;
 
     const broker = accounts[9];
     const admin = accounts[0];
@@ -62,7 +64,8 @@ contract('exchange-user', accounts => {
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
         global = await GlobalConfig.new();
         funding = await TestFundingMock.new();
-        exchange = await Exchange.new();
+        exchangeStorage = await ExchangeStorage.new();
+        exchange = await Exchange.new(exchangeStorage.address);
         perpetual = await Perpetual.new(
             global.address,
             dev,
@@ -1227,8 +1230,6 @@ contract('exchange-user', accounts => {
             ]
         );
 
-        console.log(tx);
-
         assert.equal(fromWad(await cashBalanceOf(u1)), 9880);
         assert.equal(fromWad(await positionEntryValue(u1)), 6000);
         assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 300);
@@ -1306,8 +1307,6 @@ contract('exchange-user', accounts => {
                 toWad(0)
             ]
         );
-
-        console.log(tx);
 
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
         assert.equal(fromWad(await positionEntryValue(u1)), 0);
@@ -1685,7 +1684,7 @@ contract('exchange-user', accounts => {
             );
             throw null;
         } catch (error) {
-            assert.ok(error.message.includes("invalid signature"), error);
+            assert.ok(error.message.includes("invalid signer"), error);
         }
     });
 
@@ -1757,7 +1756,7 @@ contract('exchange-user', accounts => {
                 [toWad(1)]
             );
             const takerOrderHash = getOrderHash(takerOrder);
-            assert.equal(await exchange.filled(takerOrderHash), toWad(1));
+            assert.equal(await exchangeStorage.filled(perpetual.address, takerOrderHash), toWad(1));
 
             try {
                 await exchange.matchOrders(
@@ -2275,7 +2274,7 @@ contract('exchange-user', accounts => {
                 );
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid signature"), error);
+                assert.ok(error.message.includes("invalid signer"), error);
             }
 
             try {
@@ -2295,25 +2294,26 @@ contract('exchange-user', accounts => {
             }
 
         });
+
         it("cancel order", async () => {
             const order = await buildOrder({
-                trader: u1,
-                amount: 1,
-                price: 6000,
-                version: 2,
-                side: 'buy',
-                type: 'limit',
-                expiredAtSeconds: 86400,
-                makerFeeRate: 0,
-                takerFeeRate: 0,
-                salt: 666,
-            },
+                    trader: u1,
+                    amount: 1,
+                    price: 6000,
+                    version: 2,
+                    side: 'buy',
+                    type: 'limit',
+                    expiredAtSeconds: 86400,
+                    makerFeeRate: 0,
+                    takerFeeRate: 0,
+                    salt: 666,
+                },
                 perpetual.address,
                 admin
             );
             const orderHash = getOrderHash(order);
             await exchange.cancelOrder(order);
-            assert.ok(await exchange.cancelled(orderHash));
+            assert.ok(await exchangeStorage.isCancelled(perpetual.address, orderHash));
         });
     });
 
