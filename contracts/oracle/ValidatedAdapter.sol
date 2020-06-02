@@ -14,8 +14,8 @@ contract ValidatedAdapter is Ownable {
     uint256 constant public ONE_PERCENT = 10 ** 16;
 
     // properties:
-    uint256 public lastPrice;
-    uint256 public lastTimestamp;
+    uint256 private lastPrice;
+    uint256 private lastTimestamp;
 
     // stores currently primary price feeder;
     address public primary;
@@ -60,7 +60,7 @@ contract ValidatedAdapter is Ownable {
 
         emit UpdatePrimary(primary, _primary);
         primary = _primary;
-        updatePrice();
+        // updatePrice();
     }
 
     /// @dev Set max price gap percentage allowed between primary and other validators.
