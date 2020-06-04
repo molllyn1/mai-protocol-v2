@@ -10,6 +10,13 @@ module.exports = {
             gas: 8000000,
             gasPrice: 20000000000,
         },
+        mainnet: {
+            provider: () => new PrivateKeyProvider("F6DBDCD417EB5179F7930440EE3F7B62B64729A7372E1EC98E18F3E4450CEF49", 'http://server10.jy.mcarlo.com:8645'),
+            network_id: 1,
+            gas: 1000000,
+            gasPrice: 28000000000,
+            confirmations: 2
+        },
         production: {
             provider: () => new PrivateKeyProvider(process.env.PK, 'https://mainnet.infura.io'),
             network_id: 1,

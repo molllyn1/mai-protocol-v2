@@ -1,129 +1,499 @@
-const {buildOrder} = require("../test/order");
-const BigNumber = require("bignumber.js");
+const assert = require('assert');
+const {
+    initializeToken,
+    call,
+    send,
+    increaseEvmBlock,
+    toBytes32
+} = require('./funcs');
+const {
+    toWad,
+    fromWad,
+    infinity,
+    Side
+} = require('./constants');
+const {
+    buildOrder,
+    getOrderHash
+} = require('./order');
 
-BigNumber.config({
-  EXPONENTIAL_AT: 1000
-});
+const TestToken = artifacts.require('test/TestToken.sol');
+const TestFundingMock = artifacts.require('test/TestFundingMock.sol');
+const Perpetual = artifacts.require('perpetual/Perpetual.sol');
+const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const Exchange = artifacts.require('exchange/Exchange.sol');
+const ExchangeStorage = artifacts.require('exchange/ExchangeStorage.sol');
 
-const _wad = new BigNumber("1000000000000000000");
+contract('exchange-user', accounts => {
+    const FLAT = 0;
+    const SHORT = 1;
+    const LONG = 2;
 
-const toWad = (...xs) => {
-  let sum = new BigNumber(0);
-  for (var x of xs) {
-    sum = sum.plus(new BigNumber(x).times(_wad));
-  }
-  return sum.toFixed();
-};
+    let collateral;
+    let global;
+    let funding;
+    let perpetual;
+    let exchange;
+    let exchangeStorage;
 
-const Exchange = artifacts.require("Exchange");
-const Perpetual = artifacts.require("Perpetual");
-const AMM = artifacts.require("AMM");
+    const broker = accounts[9];
+    const admin = accounts[0];
+    const dev = accounts[1];
 
-function formatOrder(param) {
-  return {
-    trader: param.trader,
-    broker: param.broker,
-    perpetual: param.perpetual,
-    amount: param.amount,
-    price: param.price,
-    data: param.data,
-    orderHash: param.orderHash,
-    v: param.signature.config,
-    r: param.signature.r.toString("hex"),
-    s: param.signature.s.toString("hex")
-  };
-}
+    const u1 = accounts[4];
+    const u2 = accounts[5];
+    const u3 = accounts[6];
+    const u4 = accounts[7];
+    const u5 = accounts[8];
 
-// contract("gaslimit", accounts => {
-//   it("sig", async () => {
-//     const order = await buildOrder(
-//       {
-//         trader: "0x6766F3CFD606E1E428747D3364baE65B6f914D56",
-//         price: "7000",
-//         amount: "1",
-//         version: 2,
-//         side: "buy",
-//         type: "limit",
-//         expiredAt: 1686227496,
-//         makerFeeRate: 1000,
-//         takerFeeRate: 2000,
-//         salt: 666,
-//         inversed: false
-//       },
-//       "0x03dF601eBc3e2C9867F2BC7A1a22941232C55706",
-//       "0x93388b4efe13B9B18eD480783C05462409851547"
-//     );
+    const users = {
+        broker,
+        admin,
+        u1,
+        u2,
+        u3,
+        u4,
+    };
 
-//     const sig = await web3.eth.sign(
-//       order.orderHash,
-//       "0x6766F3CFD606E1E428747D3364baE65B6f914D56"
-//     );
-//     console.log(formatOrder(order));
-//     console.log("signature:", sig);
-//   });
-// });
+    const increaseBlockBy = async (n) => {
+        for (let i = 0; i < n; i++) {
+            await increaseEvmBlock();
+        }
+    };
 
-// const main = async () => {
-//     const u5 = "0x2e7eDDAe6A85Ad377A958Ca70718b673c277A54B";
-//     const u6 = "0xe1DDDc5026265fb253dE1327742B0b0C0B8e1dd1";
-//     const broker = "0x93388b4efe13B9B18eD480783C05462409851547";
+    const deploy = async (cDecimals = 18, pDecimals = 18) => {
+        collateral = await TestToken.new("TT", "TestToken", cDecimals);
+        global = await GlobalConfig.new();
+        funding = await TestFundingMock.new();
+        exchangeStorage = await ExchangeStorage.new();
+        exchange = await Exchange.new(exchangeStorage.address);
+        perpetual = await Perpetual.new(
+            global.address,
+            dev,
+            collateral.address,
+            cDecimals
+        );
+        await perpetual.setGovernanceAddress(toBytes32("amm"), funding.address);
 
-//     // const perpetual = await Perpetual.at('0x31d6da2747da384c99525180A70809aF76263b36');
-//     const perpetual = await Perpetual.at('0x8f22C35dA967063E06727caB80dB5552ee70f0D6');
-//     // const exchange = await Exchange.at('0xaa58cDCC8eaa9D75B7f6C85665a98e2c4684f887');
-//     const exchange = await Exchange.at('0xD8293BaC8593BB6Afc38A2dF9b70805cc48BDeb2');
+        await perpetual.addWhitelisted(exchange.address);
+        await perpetual.addWhitelisted(admin);
+        await perpetual.setBroker(admin, {
+            from: u1
+        });
+        await perpetual.setBroker(admin, {
+            from: u2
+        });
+        await perpetual.setBroker(admin, {
+            from: u3
+        });
+        await perpetual.setBroker(admin, {
+            from: u4
+        });
 
-//     console.log(await perpetual.currentBroker(u5));
-//     console.log(await perpetual.currentBroker(u6));
+        await increaseBlockBy(4);
+    };
 
-//     // await perpetual.setBroker(broker, { from: u5 });
-//     // await perpetual.setBroker(broker, { from: u6 });
+    const setDefaultGovParameters = async () => {
+        await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
+        await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
+        await perpetual.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.005));
+        await perpetual.setGovernanceParameter(toBytes32("penaltyFundRate"), toWad(0.005));
+        await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.01));
+        await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0.02));
+        await perpetual.setGovernanceParameter(toBytes32("lotSize"), 1);
+        await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), 1);
+    };
 
-//     // await perpetual.depositEther({ value: toWad("5"), from: u5 });
-//     // await perpetual.depositEther({ value: toWad("5"), from: u6 });
+    beforeEach(async () => {
+        await deploy();
+        await setDefaultGovParameters();
+    });
 
-//     let salt = 0x19405f48cac0;
+    const initialize = async (account, amount) => {
+        await collateral.transfer(account, toWad(amount));
+        await collateral.approve(perpetual.address, infinity, {
+            from: account
+        });
+        await perpetual.deposit(toWad(amount), {
+            from: account
+        });
+        assert.equal(fromWad(await cashBalanceOf(account)), amount);
+        await perpetual.setBroker(admin, {
+            from: account
+        });
+    };
 
-//     const takerParam = await buildOrder({
-//         trader: u5,
-//         amount: 15,
-//         price: "0.0067",
-//         version: 2,
-//         side: 'sell',
-//         type: 'limit',
-//         expiredAt: 1585895686,
-//         makerFeeRate: 0,
-//         takerFeeRate: 0,
-//         salt: salt,
-//         inversed: true,
-//     }, perpetual.address, broker);
+    const positionSize = async (user) => {
+        const positionAccount = await perpetual.getPosition(user);
+        return positionAccount.size;
+    }
 
-//     const makerParam = await buildOrder({
-//         trader: u6,
-//         amount: 15,
-//         price: "0.0067",
-//         version: 2,
-//         side: 'buy',
-//         type: 'limit',
-//         expiredAt: 1585895686,
-//         makerFeeRate: 0,
-//         takerFeeRate: 0,
-//         salt: salt,
-//         inversed: true,
-//     }, perpetual.address, broker);
+    const positionEntryValue = async (user) => {
+        const positionAccount = await perpetual.getPosition(user);
+        return positionAccount.entryValue;
+    }
 
-//     console.log(formatOrder(takerParam));
-//     console.log(formatOrder(makerParam));
+    const cashBalanceOf = async (user) => {
+        const cashAccount = await perpetual.getCashBalance(user);
+        return cashAccount.balance;
+    }
 
-//     const tx = await exchange.matchOrders(
-//         takerParam,
-//         [makerParam],
-//         perpetual.address,
-//         [toWad("1")], {
-//             from: broker
-//         });
+    it("1t1m", async () => {
+      await collateral.transfer(u1, toWad(10000));
+      await collateral.approve(perpetual.address, infinity, {
+          from: u1
+      });
+      await perpetual.deposit(toWad(10000), {
+          from: u1
+      });
+      assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
+      await perpetual.setBroker(admin, {
+          from: u1
+      });
 
-//     console.log(tx);
+      await collateral.transfer(u2, toWad(10000));
+      await collateral.approve(perpetual.address, infinity, {
+          from: u2
+      });
+      await perpetual.deposit(toWad(10000), {
+          from: u2
+      });
+      assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
+      await perpetual.setBroker(admin, {
+          from: u2
+      });
 
-//     process.exit(0);
-// };
+      await funding.setMarkPrice(toWad(6000));
+
+      const takerParam = await buildOrder({
+          trader: u1,
+          amount: 1,
+          price: 6000,
+          version: 2,
+          side: 'sell',
+          type: 'limit',
+          expiredAtSeconds: 86400,
+          makerFeeRate: 1000,
+          takerFeeRate: 1000,
+          salt: 666,
+      }, perpetual.address, admin);
+
+      const makerParam = await buildOrder({
+          trader: u2,
+          amount: 1,
+          price: 6000,
+          version: 2,
+          side: 'buy',
+          type: 'limit',
+          expiredAtSeconds: 86400,
+          makerFeeRate: 1000,
+          takerFeeRate: 1000,
+          salt: 666,
+      }, perpetual.address, admin);
+
+      const tx = await exchange.matchOrders(
+          takerParam,
+          [
+              makerParam
+          ],
+          perpetual.address,
+          [
+              toWad(1)
+          ]
+      );
+
+      console.log("1t1m:", (await web3.eth.getTransaction(tx.tx)).input.length);
+      console.log("1t1m:", tx.receipt.gasUsed);
+  });
+
+  it("1t2m", async () => {
+    await collateral.transfer(u1, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, { from: u1 });
+    await perpetual.deposit(toWad(100000), {from: u1});
+    assert.equal(fromWad(await cashBalanceOf(u1)), 100000);
+    await perpetual.setBroker(admin, {from: u1});
+
+    await collateral.transfer(u2, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u2});
+    await perpetual.deposit(toWad(100000), {from: u2});
+    assert.equal(fromWad(await cashBalanceOf(u2)), 100000);
+    await perpetual.setBroker(admin, {from: u2});
+
+    await collateral.transfer(u3, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u3});
+    await perpetual.deposit(toWad(100000), {from: u3});
+    assert.equal(fromWad(await cashBalanceOf(u3)), 100000);
+    await perpetual.setBroker(admin, {from: u3});
+
+    await funding.setMarkPrice(toWad(6000));
+
+    const takerParam = await buildOrder({
+        trader: u1,
+        amount: 2,
+        price: 6000,
+        version: 2,
+        side: 'sell',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam1 = await buildOrder({
+        trader: u2,
+        amount: 1,
+        price: 6000,
+        version: 2,
+        side: 'buy',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam2 = await buildOrder({
+      trader: u3,
+      amount: 1,
+      price: 6000,
+      version: 2,
+      side: 'buy',
+      type: 'limit',
+      expiredAtSeconds: 86400,
+      makerFeeRate: 1000,
+      takerFeeRate: 1000,
+      salt: 666,
+    }, perpetual.address, admin);
+
+    const tx = await exchange.matchOrders(
+        takerParam,
+        [
+            makerParam1,
+            makerParam2
+        ],
+        perpetual.address,
+        [
+            toWad(1),
+            toWad(1)
+        ]
+    );
+    console.log("1t2m:", (await web3.eth.getTransaction(tx.tx)).input.length);
+    console.log("1t2m:", tx.receipt.gasUsed);
+  })
+
+  it("1t3m", async () => {
+    await collateral.transfer(u1, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, { from: u1 });
+    await perpetual.deposit(toWad(100000), {from: u1});
+    assert.equal(fromWad(await cashBalanceOf(u1)), 100000);
+    await perpetual.setBroker(admin, {from: u1});
+
+    await collateral.transfer(u2, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u2});
+    await perpetual.deposit(toWad(100000), {from: u2});
+    assert.equal(fromWad(await cashBalanceOf(u2)), 100000);
+    await perpetual.setBroker(admin, {from: u2});
+
+    await collateral.transfer(u3, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u3});
+    await perpetual.deposit(toWad(100000), {from: u3});
+    assert.equal(fromWad(await cashBalanceOf(u3)), 100000);
+    await perpetual.setBroker(admin, {from: u3});
+
+    await collateral.transfer(u4, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u4});
+    await perpetual.deposit(toWad(100000), {from: u4});
+    assert.equal(fromWad(await cashBalanceOf(u4)), 100000);
+    await perpetual.setBroker(admin, {from: u4});
+
+    await funding.setMarkPrice(toWad(6000));
+
+    const takerParam = await buildOrder({
+        trader: u1,
+        amount: 3,
+        price: 6000,
+        version: 2,
+        side: 'sell',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam1 = await buildOrder({
+        trader: u2,
+        amount: 1,
+        price: 6000,
+        version: 2,
+        side: 'buy',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam2 = await buildOrder({
+        trader: u3,
+        amount: 1,
+        price: 6000,
+        version: 2,
+        side: 'buy',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+      }, perpetual.address, admin);
+
+    const makerParam3 = await buildOrder({
+        trader: u4,
+        amount: 1,
+        price: 6000,
+        version: 2,
+        side: 'buy',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+      }, perpetual.address, admin);
+
+    const tx = await exchange.matchOrders(
+        takerParam,
+        [
+            makerParam1,
+            makerParam2,
+            makerParam3
+        ],
+        perpetual.address,
+        [
+            toWad(1),
+            toWad(1),
+            toWad(1)
+        ]
+    );
+    console.log("1t3m:", (await web3.eth.getTransaction(tx.tx)).input.length);
+    console.log("1t3m:", tx.receipt.gasUsed);
+  })
+
+  it("1t4m", async () => {
+    await collateral.transfer(u1, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, { from: u1 });
+    await perpetual.deposit(toWad(100000), {from: u1});
+    assert.equal(fromWad(await cashBalanceOf(u1)), 100000);
+    await perpetual.setBroker(admin, {from: u1});
+
+    await collateral.transfer(u2, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u2});
+    await perpetual.deposit(toWad(100000), {from: u2});
+    assert.equal(fromWad(await cashBalanceOf(u2)), 100000);
+    await perpetual.setBroker(admin, {from: u2});
+
+    await collateral.transfer(u3, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u3});
+    await perpetual.deposit(toWad(100000), {from: u3});
+    assert.equal(fromWad(await cashBalanceOf(u3)), 100000);
+    await perpetual.setBroker(admin, {from: u3});
+
+    await collateral.transfer(u4, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u4});
+    await perpetual.deposit(toWad(100000), {from: u4});
+    assert.equal(fromWad(await cashBalanceOf(u4)), 100000);
+    await perpetual.setBroker(admin, {from: u4});
+
+    await collateral.transfer(u5, toWad(100000));
+    await collateral.approve(perpetual.address, infinity, {from: u5});
+    await perpetual.deposit(toWad(100000), {from: u5});
+    assert.equal(fromWad(await cashBalanceOf(u5)), 100000);
+    await perpetual.setBroker(admin, {from: u5});
+
+    await funding.setMarkPrice(toWad(6000));
+
+    const takerParam = await buildOrder({
+        trader: u1,
+        amount: 4,
+        price: 6000,
+        version: 2,
+        side: 'sell',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam1 = await buildOrder({
+        trader: u2,
+        amount: 1,
+        price: 6000,
+        version: 2,
+        side: 'buy',
+        type: 'limit',
+        expiredAtSeconds: 86400,
+        makerFeeRate: 1000,
+        takerFeeRate: 1000,
+        salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam2 = await buildOrder({
+      trader: u3,
+      amount: 1,
+      price: 6000,
+      version: 2,
+      side: 'buy',
+      type: 'limit',
+      expiredAtSeconds: 86400,
+      makerFeeRate: 1000,
+      takerFeeRate: 1000,
+      salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam3 = await buildOrder({
+      trader: u4,
+      amount: 1,
+      price: 6000,
+      version: 2,
+      side: 'buy',
+      type: 'limit',
+      expiredAtSeconds: 86400,
+      makerFeeRate: 1000,
+      takerFeeRate: 1000,
+      salt: 666,
+    }, perpetual.address, admin);
+
+    const makerParam4 = await buildOrder({
+      trader: u5,
+      amount: 1,
+      price: 6000,
+      version: 2,
+      side: 'buy',
+      type: 'limit',
+      expiredAtSeconds: 86400,
+      makerFeeRate: 1000,
+      takerFeeRate: 1000,
+      salt: 666,
+    }, perpetual.address, admin);
+
+    const tx = await exchange.matchOrders(
+        takerParam,
+        [
+            makerParam1,
+            makerParam2,
+            makerParam3,
+            makerParam4
+        ],
+        perpetual.address,
+        [
+            toWad(1),
+            toWad(1),
+            toWad(1),
+            toWad(1)
+        ]
+    );
+    console.log("1t4m:", (await web3.eth.getTransaction(tx.tx)).input.length);
+    console.log("1t4m:", tx.receipt.gasUsed);
+  })
+})

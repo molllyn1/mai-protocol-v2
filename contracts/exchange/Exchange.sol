@@ -170,14 +170,6 @@ contract Exchange {
         require(takerOrderParam.isSell() ? takerPrice <= makerPrice : takerPrice >= makerPrice, "price not match");
     }
 
-    function test() public view returns (uint256) {
-        uint256 id;
-        assembly {
-            id := chainid()
-        }
-        return id;
-    }
-
     function getOrderContext(address _perpetual) internal view returns (LibOrder.OrderContext memory orderContext) {
         uint256 id;
         assembly {
@@ -205,7 +197,7 @@ contract Exchange {
         require(stateStorage.filled(address(perpetual), orderHash) < orderParam.amount, "fullfilled order");
 
         address signerAddress = orderParam.signature.getSignerAddress(orderHash);
-        require(signerAddress == orderParam.trader || stateStorage.isAgent(address(perpetual), orderParam.trader, signerAddress), "invalid signer");
+        require(signerAddress == orderParam.trader || stateStorage.isDelegate(address(perpetual), orderParam.trader, signerAddress), "invalid signer");
         return orderHash;
     }
 

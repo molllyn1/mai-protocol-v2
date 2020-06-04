@@ -20,6 +20,7 @@
   "devDependencies": {
     "prettier": "^1.19.1",
     "prettier-plugin-solidity": "^1.0.0-alpha.37",
+    "sol-merger": "^3.0.1",
     "solidity-coverage": "^0.7.2"
   }
 }

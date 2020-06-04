@@ -2,19 +2,19 @@ pragma solidity 0.5.17;
 
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 
-import "../lib/LibAddressList.sol";
+import "../lib/LibList.sol";
 import {LibMathUnsigned} from "../lib/LibMath.sol";
 
 import "../interface/IMakerMedianFeeder.sol";
 
 contract MakerMedianAdapter is Ownable {
     using LibMathUnsigned for uint256;
-    using LibAddressList for LibAddressList.List;
+    using LibList for LibList.AddressList;
 
     IMakerMedianFeeder public feeder;
     uint256 public decimals;
     uint256 public converter;
-    LibAddressList.List private whitelist;
+    LibList.AddressList private whitelist;
 
     event AddWhitelisted(address indexed guy);
     event RemoveWhitelisted(address indexed guy);

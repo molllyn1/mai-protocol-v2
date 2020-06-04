@@ -13,13 +13,13 @@ contract ExchangeStorage {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
-    event SetAgent(address indexed perpetual, address indexed owner, address indexed agent);
-    event UnsetAgent(address indexed perpetual, address indexed owner, address indexed lastAgent);
+    event SetDelegate(address indexed perpetual, address indexed owner, address indexed delegate);
+    event UnsetDelegate(address indexed perpetual, address indexed owner, address indexed lastDelegate);
 
     struct State {
         mapping(bytes32 => uint256) filled;
         mapping(bytes32 => bool) cancelled;
-        mapping(address => address) agents;
+        mapping(address => address) delegates;
     }
 
     mapping(address => State) states;
@@ -55,27 +55,27 @@ contract ExchangeStorage {
         states[perpetual].cancelled[orderHash] = true;
     }
 
-    function getAgent(address perpetual, address owner) public view returns (address) {
-        return states[perpetual].agents[owner];
+    function getDelegate(address perpetual, address owner) public view returns (address) {
+        return states[perpetual].delegates[owner];
     }
 
-    function isAgent(
+    function isDelegate(
         address perpetual,
         address owner,
-        address agent
+        address delegate
     ) public view returns (bool) {
-        return getAgent(perpetual, owner) == agent;
+        return getDelegate(perpetual, owner) == delegate;
     }
 
-    function setAgent(address perpetual, address agent) external {
-        require(!isAgent(perpetual, msg.sender, agent), "agent already set");
-        states[perpetual].agents[msg.sender] = agent;
-        emit SetAgent(perpetual, msg.sender, agent);
+    function setDelegate(address perpetual, address delegate) external {
+        require(!isDelegate(perpetual, msg.sender, delegate), "delegate already set");
+        states[perpetual].delegates[msg.sender] = delegate;
+        emit SetDelegate(perpetual, msg.sender, delegate);
     }
 
-    function unsetAgent(address perpetual) external {
-        require(!isAgent(perpetual, msg.sender, address(0x0)), "agent unset");
-        emit UnsetAgent(perpetual, msg.sender, states[perpetual].agents[msg.sender]);
-        states[perpetual].agents[msg.sender] = address(0x0);
+    function unsetDelegate(address perpetual) external {
+        require(!isDelegate(perpetual, msg.sender, address(0x0)), "delegate unset");
+        emit UnsetDelegate(perpetual, msg.sender, states[perpetual].delegates[msg.sender]);
+        states[perpetual].delegates[msg.sender] = address(0x0);
     }
 }

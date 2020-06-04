@@ -43,7 +43,7 @@ contract Perpetual is Brokerage, Position {
     }
 
     // Admin functions
-    function setCashBalance(address guy, int256 amount) public onlyWhitelistAdmin {
+    function setCashBalance(address guy, int256 amount) public onlyOwner {
         require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
         int256 deltaAmount = amount.sub(cashBalances[guy].balance);
         cashBalances[guy].balance = amount;
@@ -63,7 +63,7 @@ contract Perpetual is Brokerage, Position {
         setBroker(msg.sender, broker, globalConfig.brokerLockBlockCount());
     }
 
-    function setBrokerFor(address guy, address broker) public onlyWhitelisted {
+    function setBrokerFor(address guy, address broker) public onlyAuthorizedComponent {
         setBroker(guy, broker, globalConfig.brokerLockBlockCount());
     }
 
@@ -80,13 +80,13 @@ contract Perpetual is Brokerage, Position {
         }
     }
 
-    function depositFor(address guy, uint256 amount) public onlyWhitelisted {
+    function depositFor(address guy, uint256 amount) public onlyAuthorizedComponent {
         require(isTokenizedCollateral(), "token not acceptable");
 
         depositToAccount(guy, amount);
     }
 
-    function depositEtherFor(address guy) public payable onlyWhitelisted {
+    function depositEtherFor(address guy) public payable onlyAuthorizedComponent {
         require(!isTokenizedCollateral(), "ether not acceptable");
 
         depositToAccount(guy, msg.value);
@@ -145,7 +145,7 @@ contract Perpetual is Brokerage, Position {
         withdrawAll(guy);
     }
 
-    function endGlobalSettlement() public onlyWhitelistAdmin {
+    function endGlobalSettlement() public onlyOwner {
         require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
 
         address guy = address(amm.perpetualProxy());
@@ -157,7 +157,7 @@ contract Perpetual is Brokerage, Position {
 
     function withdrawFromAccount(address payable guy, uint256 amount) private {
         require(guy != address(0), "invalid guy");
-        require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
+        require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
 
         uint256 currentMarkPrice = markPrice();
         require(isSafeWithPrice(guy, currentMarkPrice), "unsafe before withdraw");
@@ -170,8 +170,7 @@ contract Perpetual is Brokerage, Position {
         require(availableMarginWithPrice(guy, currentMarkPrice) >= 0, "withdraw margin");
     }
 
-    function withdrawFor(address payable guy, uint256 amount) public onlyWhitelisted {
-        require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
+    function withdrawFor(address payable guy, uint256 amount) public onlyAuthorizedComponent {
         withdrawFromAccount(guy, amount);
     }
 
@@ -203,7 +202,7 @@ contract Perpetual is Brokerage, Position {
         emit UpdateInsuranceFund(insuranceFundBalance);
     }
 
-    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyWhitelistAdmin {
+    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyOwner {
         require(rawAmount > 0, "invalid amount");
         require(insuranceFundBalance > 0, "insufficient funds");
         require(rawAmount <= insuranceFundBalance.toUint256(), "insufficient funds");
@@ -274,6 +273,7 @@ contract Perpetual is Brokerage, Position {
         address guy,
         uint256 maxAmount
     ) public returns (uint256, uint256) {
+        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
         require(maxAmount.mod(governance.lotSize) == 0, "invalid lot size");
         require(!isSafe(guy), "safe account");
 
@@ -295,7 +295,6 @@ contract Perpetual is Brokerage, Position {
     }
 
     function liquidate(address guy, uint256 maxAmount) public returns (uint256, uint256) {
-        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
         return liquidateFrom(msg.sender, guy, maxAmount);
     }
 
@@ -304,7 +303,7 @@ contract Perpetual is Brokerage, Position {
         LibTypes.Side side,
         uint256 price,
         uint256 amount
-    ) public onlyWhitelisted returns (uint256) {
+    ) public onlyAuthorizedComponent returns (uint256) {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
 
@@ -321,7 +320,7 @@ contract Perpetual is Brokerage, Position {
         address from,
         address to,
         uint256 amount
-    ) public onlyWhitelisted {
+    ) public onlyAuthorizedComponent {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         transferBalance(from, to, amount.toInt256());
     }
