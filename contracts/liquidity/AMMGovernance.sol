@@ -26,7 +26,7 @@ contract AMMGovernance is WhitelistedRole {
             governance.poolDevFeeRate = value.toUint256();
         } else if (key == "emaAlpha") {
             require(value > 0, "alpha should be > 0");
-            require(value < 10**18, "alpha should be < 1");
+            require(value <= 10**18, "alpha should be <= 1");
             governance.emaAlpha = value;
             emaAlpha2 = 10**18 - governance.emaAlpha;
             emaAlpha2Ln = emaAlpha2.wln();
