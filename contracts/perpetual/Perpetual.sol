@@ -155,7 +155,7 @@ contract Perpetual is Brokerage, Position {
 
     function withdrawFromAccount(address payable guy, uint256 amount) private {
         require(guy != address(0), "invalid guy");
-        require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
+        require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
 
         uint256 currentMarkPrice = markPrice();
         require(isSafeWithPrice(guy, currentMarkPrice), "unsafe before withdraw");
@@ -169,7 +169,6 @@ contract Perpetual is Brokerage, Position {
     }
 
     function withdrawFor(address payable guy, uint256 amount) public onlyWhitelisted {
-        require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
         withdrawFromAccount(guy, amount);
     }
 
@@ -183,7 +182,6 @@ contract Perpetual is Brokerage, Position {
 
         int256 wadAmount = depositToProtocol(msg.sender, rawAmount);
         insuranceFundBalance = insuranceFundBalance.add(wadAmount);
-
         require(insuranceFundBalance >= 0, "negtive insurance fund");
 
         emit UpdateInsuranceFund(insuranceFundBalance);
@@ -268,6 +266,7 @@ contract Perpetual is Brokerage, Position {
     }
 
     function liquidateFrom(address from, address guy, uint256 maxAmount) public returns (uint256, uint256) {
+        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
         require(maxAmount.mod(governance.lotSize) == 0, "invalid lot size");
         require(!isSafe(guy), "safe account");
 
@@ -289,7 +288,6 @@ contract Perpetual is Brokerage, Position {
     }
 
     function liquidate(address guy, uint256 maxAmount) public returns (uint256, uint256) {
-        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
         return liquidateFrom(msg.sender, guy, maxAmount);
     }
 

@@ -288,7 +288,7 @@ contract Position is Collateral, PerpetualGovernance {
         } else {
             int256 newSocialLoss = liquidationLoss.sub(insuranceFundBalance);
             insuranceFundBalance = 0;
-            handleSocialLoss(liquidationSide, newSocialLoss);
+            handleSocialLoss(liquidationSide.counterSide(), newSocialLoss);
         }
         require(insuranceFundBalance >= 0, "negtive insurance fund");
 
