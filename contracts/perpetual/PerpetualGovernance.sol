@@ -1,6 +1,7 @@
-pragma solidity 0.5.17;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
+import "@openzeppelin/contracts/access/roles/WhitelistedRole.sol";
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 
@@ -8,7 +9,7 @@ import "../interface/IAMM.sol";
 import "../interface/IGlobalConfig.sol";
 
 
-contract PerpetualGovernance {
+contract PerpetualGovernance is WhitelistedRole {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
@@ -25,16 +26,6 @@ contract PerpetualGovernance {
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
     event UpdateGovernanceAddress(bytes32 indexed key, address value);
 
-    modifier onlyOwner() {
-        require(globalConfig.owner() == msg.sender, "not owner");
-        _;
-    }
-
-    modifier onlyAuthorizedComponent() {
-        require(globalConfig.isAuthorizedComponent(msg.sender), "not owner");
-        _;
-    }
-
     modifier ammRequired() {
         require(address(amm) != address(0x0), "no automated market maker");
         _;
@@ -44,7 +35,7 @@ contract PerpetualGovernance {
         return governance;
     }
 
-    function setGovernanceParameter(bytes32 key, int256 value) public onlyOwner {
+    function setGovernanceParameter(bytes32 key, int256 value) public onlyWhitelistAdmin {
         if (key == "initialMarginRate") {
             governance.initialMarginRate = value.toUint256();
             require(governance.initialMarginRate > 0, "require im > 0");
@@ -87,7 +78,7 @@ contract PerpetualGovernance {
         emit UpdateGovernanceParameter(key, value);
     }
 
-    function setGovernanceAddress(bytes32 key, address value) public onlyOwner {
+    function setGovernanceAddress(bytes32 key, address value) public onlyWhitelistAdmin {
         require(value != address(0x0), "invalid address");
         if (key == "dev") {
             devAddress = value;
@@ -101,7 +92,7 @@ contract PerpetualGovernance {
         emit UpdateGovernanceAddress(key, value);
     }
 
-    function beginGlobalSettlement(uint256 price) public onlyOwner {
+    function beginGlobalSettlement(uint256 price) public onlyWhitelistAdmin {
         require(status != LibTypes.Status.SETTLED, "already settled");
         settlementPrice = price;
         status = LibTypes.Status.SETTLING;

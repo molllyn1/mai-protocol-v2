@@ -1,4 +1,4 @@
-pragma solidity 0.5.17;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibMath.sol";
@@ -170,16 +170,10 @@ contract Exchange {
         require(takerOrderParam.isSell() ? takerPrice <= makerPrice : takerPrice >= makerPrice, "price not match");
     }
 
-    function getOrderContext(address _perpetual) internal view returns (LibOrder.OrderContext memory orderContext) {
-        uint256 id;
+    function getChainId() internal pure returns (uint256 id) {
         assembly {
             id := chainid()
         }
-        orderContext = LibOrder.OrderContext({
-            chainId: id,
-            perpetual: _perpetual,
-            broker: msg.sender
-        });
     }
 
     function validateOrderParam(IPerpetual perpetual, LibOrder.OrderParam memory orderParam)
@@ -187,12 +181,13 @@ contract Exchange {
         view
         returns (bytes32)
     {
-        LibOrder.OrderContext memory orderContext = getOrderContext(address(perpetual));
-        require(perpetual.currentBroker(orderParam.trader) == orderContext.broker, "invalid broker");
-        require(orderParam.getOrderVersion() == 2, "unsupported version");
+        address broker = msg.sender;
+        require(perpetual.currentBroker(orderParam.trader) == broker, "invalid broker");
+        require(orderParam.getOrderVersion() == SUPPORTED_ORDER_VERSION, "unsupported version");
         require(orderParam.getExpiredAt() >= block.timestamp, "order expired");
+        require(orderParam.chainId() >= getChainId(), "");
 
-        bytes32 orderHash = orderParam.getOrderHash(orderContext);
+        bytes32 orderHash = orderParam.getOrderHash(address(perpetual), broker);
         require(!stateStorage.isCancelled(address(perpetual), orderHash), "cancelled order");
         require(stateStorage.filled(address(perpetual), orderHash) < orderParam.amount, "fullfilled order");
 
@@ -214,7 +209,7 @@ contract Exchange {
     }
 
     function cancelOrder(LibOrder.Order memory order) public {
-        require(msg.sender == order.trader || msg.sender == order.broker, "invalid caller");
+        require(msg.sender == order.broker, "invalid caller");
         bytes32 orderHash = order.getOrderHash();
         stateStorage.setCancelled(order.perpetual, orderHash);
         emit Cancel(orderHash);

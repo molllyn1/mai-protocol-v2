@@ -1,4 +1,4 @@
-pragma solidity 0.5.17;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -43,7 +43,7 @@ contract Perpetual is Brokerage, Position {
     }
 
     // Admin functions
-    function setCashBalance(address guy, int256 amount) public onlyOwner {
+    function setCashBalance(address guy, int256 amount) public onlyWhitelistAdmin {
         require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
         int256 deltaAmount = amount.sub(cashBalances[guy].balance);
         cashBalances[guy].balance = amount;
@@ -63,7 +63,7 @@ contract Perpetual is Brokerage, Position {
         setBroker(msg.sender, broker, globalConfig.brokerLockBlockCount());
     }
 
-    function setBrokerFor(address guy, address broker) public onlyAuthorizedComponent {
+    function setBrokerFor(address guy, address broker) public onlyWhitelisted {
         setBroker(guy, broker, globalConfig.brokerLockBlockCount());
     }
 
@@ -80,13 +80,13 @@ contract Perpetual is Brokerage, Position {
         }
     }
 
-    function depositFor(address guy, uint256 amount) public onlyAuthorizedComponent {
+    function depositFor(address guy, uint256 amount) public onlyWhitelisted {
         require(isTokenizedCollateral(), "token not acceptable");
 
         depositToAccount(guy, amount);
     }
 
-    function depositEtherFor(address guy) public payable onlyAuthorizedComponent {
+    function depositEtherFor(address guy) public payable onlyWhitelisted {
         require(!isTokenizedCollateral(), "ether not acceptable");
 
         depositToAccount(guy, msg.value);
@@ -145,7 +145,7 @@ contract Perpetual is Brokerage, Position {
         withdrawAll(guy);
     }
 
-    function endGlobalSettlement() public onlyOwner {
+    function endGlobalSettlement() public onlyWhitelistAdmin {
         require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
 
         address guy = address(amm.perpetualProxy());
@@ -170,7 +170,7 @@ contract Perpetual is Brokerage, Position {
         require(availableMarginWithPrice(guy, currentMarkPrice) >= 0, "withdraw margin");
     }
 
-    function withdrawFor(address payable guy, uint256 amount) public onlyAuthorizedComponent {
+    function withdrawFor(address payable guy, uint256 amount) public onlyWhitelisted {
         withdrawFromAccount(guy, amount);
     }
 
@@ -202,7 +202,7 @@ contract Perpetual is Brokerage, Position {
         emit UpdateInsuranceFund(insuranceFundBalance);
     }
 
-    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyOwner {
+    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyWhitelistAdmin {
         require(rawAmount > 0, "invalid amount");
         require(insuranceFundBalance > 0, "insufficient funds");
         require(rawAmount <= insuranceFundBalance.toUint256(), "insufficient funds");
@@ -303,7 +303,11 @@ contract Perpetual is Brokerage, Position {
         LibTypes.Side side,
         uint256 price,
         uint256 amount
-    ) public onlyAuthorizedComponent returns (uint256) {
+    )
+        public
+        onlyWhitelisted
+        returns (uint256)
+    {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
 
@@ -320,7 +324,10 @@ contract Perpetual is Brokerage, Position {
         address from,
         address to,
         uint256 amount
-    ) public onlyAuthorizedComponent {
+    )
+        public
+        onlyWhitelisted
+    {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         transferBalance(from, to, amount.toInt256());
     }

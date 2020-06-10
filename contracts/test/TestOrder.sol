@@ -1,4 +1,4 @@
-pragma solidity 0.5.17;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibOrder.sol";
@@ -7,15 +7,16 @@ import "../perpetual/Perpetual.sol";
 
 
 contract TestOrder {
-    using LibOrder for LibOrder.OrderParam;
     using LibOrder for LibOrder.Order;
+    using LibOrder for LibOrder.OrderParam;
     using LibSignature for LibSignature.OrderSignature;
 
     function getOrder(
         LibOrder.OrderParam memory orderParam,
-        LibOrder.OrderContext memory orderContext
+        address perpetual,
+        address broker
     ) public pure returns (LibOrder.Order memory order) {
-        order = orderParam.getOrder(orderContext);
+        order = orderParam.getOrder(perpetual, broker);
     }
 
     function hashOrder(LibOrder.Order memory order) public pure returns (bytes32) {
@@ -28,9 +29,10 @@ contract TestOrder {
 
     function getOrderHash2(
         LibOrder.OrderParam memory orderParam,
-        LibOrder.OrderContext memory orderContext
+        address perpetual,
+        address broker
     ) public pure returns (bytes32) {
-        return orderParam.getOrderHash(orderContext);
+        return orderParam.getOrderHash(perpetual, broker);
     }
 
 

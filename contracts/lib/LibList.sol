@@ -1,4 +1,4 @@
-pragma solidity 0.5.17;
+pragma solidity 0.5.15;
 
 library LibList {
 
@@ -23,7 +23,7 @@ library LibList {
     }
 
     /// @dev Get if a list is full
-    function isfull(AddressList storage list, address target) internal view returns (bool) {
+    function isfull(AddressList storage list) internal view returns (bool) {
         return list.addressList.length == list.limit;
     }
 
