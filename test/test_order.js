@@ -57,7 +57,14 @@ contract('order', accounts => {
             data: offline.data,
             signature: offline.signature,
         };
-        const orderHash = await testOrder.getOrderHash(await testOrder.getOrder(orderParam, perpetualAddress, admin));
+        const order = await testOrder.getOrder(orderParam, perpetualAddress, admin);
+        const orderHash = await testOrder.getOrderHash(order);
+
+        console.log("----")
+        console.log(orderParam.data);
+        console.log("++++", await testOrder.chainId(orderParam, {}));
+        console.log("----")
+
 
         assert.equal(getOrderHash(offline), orderHash);
         assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, {from:admin}), 1589366656);

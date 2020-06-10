@@ -1,11 +1,11 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
-import "../perpetual/Position.sol";
+import "../perpetual/MarginAccount.sol";
 
 
-contract TestPosition is Position {
-    constructor(address collateral, uint256 decimals) public Position(collateral, decimals) {}
+contract TestMarginAccount is MarginAccount {
+    constructor(address _collateral, uint256 _decimals) public MarginAccount(_collateral, _decimals) {}
 
     function marginBalanceWithPricePublic(address guy, uint256 markPrice) public returns (int256) {
         return marginBalanceWithPrice(guy, markPrice);
@@ -66,21 +66,13 @@ contract TestPosition is Position {
         liquidate(liquidator, guy, liquidationPrice, liquidationAmount);
     }
 
-    function setSocialLossPerContractPublic(LibTypes.Side side, int256 value) public {
-        addSocialLossPerContract(side, value.sub(socialLossPerContract(side)));
-    }
-
-    function addSocialLossPerContractPublic(LibTypes.Side side, int256 value) public {
-        addSocialLossPerContract(side, value);
-    }
-
     function fundingLossPublic(address guy) public returns (int256) {
-        LibTypes.PositionAccount memory account = getPosition(guy);
+        LibTypes.MarginAccount memory account = getMarginAccount(guy);
         return fundingLoss(account);
     }
 
     function socialLossPublic(address guy) public view returns (int256) {
-        LibTypes.PositionAccount memory account = getPosition(guy);
+        LibTypes.MarginAccount memory account = getMarginAccount(guy);
         return socialLoss(account);
     }
 

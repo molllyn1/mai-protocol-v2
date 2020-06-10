@@ -76,7 +76,12 @@ contract('TestCollateral', accounts => {
             await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
             await increaseBlockBy(4);
 
-            await vault.withdrawPublic(0, { from: u1 });
+            try {
+                await vault.withdrawPublic(0, { from: u1 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid amount"), error);
+            }
             assert.equal(await cashBalanceOf(u1), toWad(3.1415));
 
             try {
@@ -96,8 +101,6 @@ contract('TestCollateral', accounts => {
             await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
             await increaseBlockBy(4);
 
-            await vault.withdrawPublic(0, { from: u1 });
-            assert.equal(await cashBalanceOf(u1), toWad(3.1415));
             try {
                 await vault.withdrawPublic(toWad(3.1416), { from: u1 });
                 throw null;
@@ -106,6 +109,8 @@ contract('TestCollateral', accounts => {
             }
         });
     });
+
+    return;
 
     describe("misc", async () => {
 

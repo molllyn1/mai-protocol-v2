@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 
 interface IGlobalConfig {
     function withdrawalLockBlockCount() external view returns (uint256);

@@ -1,6 +1,7 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
+import "@openzeppelin/contracts/cryptography/ECDSA.sol";
 
 library LibSignature {
     enum SignatureMethod {ETH_SIGN, EIP712}

@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../interface/IAMM.sol";
@@ -9,11 +9,11 @@ import "../lib/LibTypes.sol";
 interface IPerpetual {
     function devAddress() external view returns (address);
 
-    function getCashBalance(address guy) external view returns (LibTypes.CollateralAccount memory);
+    function getMarginAccount(address guy) external view returns (LibTypes.MarginAccount memory);
 
-    function getPosition(address guy) external view returns (LibTypes.PositionAccount memory);
+    function getWithdrawalLock(address guy) external view returns (LibTypes.DelayedVariable memory);
 
-    function getBroker(address guy) external view returns (LibTypes.Broker memory);
+    function getBroker(address guy) external view returns (LibTypes.DelayedVariable memory);
 
     function getGovernance() external view returns (LibTypes.PerpGovernanceConfig memory);
 

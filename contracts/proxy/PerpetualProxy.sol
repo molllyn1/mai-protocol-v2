@@ -1,7 +1,6 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
-import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 import "../interface/IPerpetual.sol";
 import "../interface/IPerpetualProxy.sol";
@@ -52,38 +51,38 @@ contract PerpetualProxy {
     }
 
     function getPoolAccount() public view returns (IPerpetualProxy.PoolAccount memory pool) {
-        LibTypes.PositionAccount memory position = perpetual.getPosition(self());
+        LibTypes.MarginAccount memory position = perpetual.getMarginAccount(self());
         require(position.side != LibTypes.Side.SHORT, "pool should be long");
         pool.positionSize = position.size;
         pool.positionEntryValue = position.entryValue;
         pool.positionEntrySocialLoss = position.entrySocialLoss;
         pool.positionEntryFundingLoss = position.entryFundingLoss;
-        pool.cashBalance = perpetual.getCashBalance(self()).balance;
+        pool.cashBalance = perpetual.getMarginAccount(self()).cashBalance;
         pool.socialLossPerContract = perpetual.socialLossPerContract(LibTypes.Side.LONG);
     }
 
     function cashBalance() public view returns (int256) {
-        return perpetual.getCashBalance(self()).balance;
+        return perpetual.getMarginAccount(self()).cashBalance;
     }
 
     function positionSize() public view returns (uint256) {
-        return perpetual.getPosition(self()).size;
+        return perpetual.getMarginAccount(self()).size;
     }
 
     function positionSide() public view returns (LibTypes.Side) {
-        return perpetual.getPosition(self()).side;
+        return perpetual.getMarginAccount(self()).side;
     }
 
     function positionEntryValue() public view returns (uint256) {
-        return perpetual.getPosition(self()).entryValue;
+        return perpetual.getMarginAccount(self()).entryValue;
     }
 
     function positionEntrySocialLoss() public view returns (int256) {
-        return perpetual.getPosition(self()).entrySocialLoss;
+        return perpetual.getMarginAccount(self()).entrySocialLoss;
     }
 
     function positionEntryFundingLoss() public view returns (int256) {
-        return perpetual.getPosition(self()).entryFundingLoss;
+        return perpetual.getMarginAccount(self()).entryFundingLoss;
     }
 
     function socialLossPerContract(LibTypes.Side side) public view returns (int256) {

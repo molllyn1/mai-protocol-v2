@@ -1,5 +1,5 @@
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/DelegateProxy.sol');
 
 module.exports = async function (deployer, network, accounts) {
     const perpetual = await Perpetual.deployed();

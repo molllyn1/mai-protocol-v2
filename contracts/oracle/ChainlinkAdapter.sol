@@ -1,21 +1,48 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
+
+import "@openzeppelin/contracts/ownership/Ownable.sol";
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../interface/IChainlinkFeeder.sol";
 
 
-contract ChainlinkAdapter {
+contract ChainlinkAdapter is Ownable {
     using LibMathSigned for int256;
+    using LibMathUnsigned for uint256;
+
+    int256 public constant CHAINLINK_DECIMALS_ADAPTER = 10**10;
+    uint256 public constant ONE = 10 ** 18;
 
     IChainlinkFeeder public feeder;
-    int256 public constant chainlinkDecimalsAdapter = 10**10;
+    uint256 public timeout;
+    bool public inversed;
 
-    constructor(address _feeder) public {
+    constructor(address _feeder, uint256 _timeout, bool _inversed) public {
+        require(_feeder != address(0), "invalid feeder");
+        timeout = _timeout;
         feeder = IChainlinkFeeder(_feeder);
+        inversed = _inversed;
     }
 
+    /**
+     * @dev Set the timeout of price read from oracle. Only owner is allowed to set the timeout.
+     * @param _timeout The timeout in seconds.
+     */
+    function setTimeout(uint256 _timeout) external onlyOwner {
+        timeout = _timeout;
+    }
+
+    /** Read price from oracle with extra checks.
+     */
     function price() public view returns (uint256 newPrice, uint256 timestamp) {
-        newPrice = (feeder.latestAnswer() * chainlinkDecimalsAdapter).toUint256();
+        newPrice = (feeder.latestAnswer().mul(CHAINLINK_DECIMALS_ADAPTER)).toUint256();
+        require(newPrice != 0, "invalid price");
         timestamp = feeder.latestTimestamp();
+        require(timestamp <= block.timestamp, "future timestmap");
+        require(timestamp.add(timeout) >= block.timestamp, "price timeout");
+
+        if (inversed) {
+            newPrice = ONE.wdiv(newPrice);
+        }
     }
 }

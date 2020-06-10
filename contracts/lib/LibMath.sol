@@ -1,9 +1,18 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 
 
 library LibMathSigned {
     int256 private constant _WAD = 10**18;
     int256 private constant _INT256_MIN = -2**255;
+
+    uint8 private constant FIXED_DIGITS = 18;
+    int256 private constant FIXED_1 = 10 ** 18;
+    int256 private constant FIXED_E = 2718281828459045235;
+    uint8 private constant LONGER_DIGITS = 36;
+    int256 private constant LONGER_FIXED_LOG_E_1_5 = 405465108108164381978013115464349137;
+    int256 private constant LONGER_FIXED_1 = 10 ** 36;
+    int256 private constant LONGER_FIXED_LOG_E_10 = 2302585092994045684017991454684364208;
+
 
     function WAD() internal pure returns (int256) {
         return _WAD;
@@ -85,17 +94,17 @@ library LibMathSigned {
     function wfrac(int256 x, int256 y, int256 z) internal pure returns (int256 r) {
         int256 t = mul(x, y);
         if (z < 0) {
-            z = -z;
-            t = -t;
+            z = neg(z);
+            t = neg(t);
         }
         r = roundHalfUp(t, z) / z;
     }
 
-    function min(int256 x, int256 y) internal pure returns (int256 z) {
+    function min(int256 x, int256 y) internal pure returns (int256) {
         return x <= y ? x : y;
     }
 
-    function max(int256 x, int256 y) internal pure returns (int256 z) {
+    function max(int256 x, int256 y) internal pure returns (int256) {
         return x >= y ? x : y;
     }
 
@@ -121,14 +130,6 @@ library LibMathSigned {
         }
     }
 
-    uint8 internal constant fixed_digits = 18;
-    int256 internal constant fixed_1 = 1000000000000000000;
-    int256 internal constant fixed_e = 2718281828459045235;
-    uint8 internal constant longer_digits = 36;
-    int256 internal constant longer_fixed_log_e_1_5 = 405465108108164381978013115464349137;
-    int256 internal constant longer_fixed_1 = 1000000000000000000000000000000000000;
-    int256 internal constant longer_fixed_log_e_10 = 2302585092994045684017991454684364208;
-
     // ROUND_HALF_UP rule helper. You have to call roundHalfUp(x, y) / y to finish the rounding operation
     // 0.5 ≈ 1, 0.4 ≈ 0, -0.5 ≈ -1, -0.4 ≈ 0
     function roundHalfUp(int256 x, int256 y) internal pure returns (int256) {
@@ -139,52 +140,35 @@ library LibMathSigned {
         return sub(x, y / 2);
     }
 
-    // function roundFloor(int256 x, int256 y) internal pure returns (int256) {
-    //     require(y > 0, "roundFloor only supports y > 0");
-    //     if (x >= 0 || x % _WAD == 0) {
-    //         return x;
-    //     }
-    //     return sub(x, y);
-    // }
-
-    // function roundCeil(int256 x, int256 y) internal pure returns (int256) {
-    //     require(y > 0, "roundCeil only supports y > 0");
-    //     if (x <= 0 || x % _WAD == 0) {
-    //         return x;
-    //     }
-    //     return add(x, y);
-    // }
-
-    // Log(e, x)
     // solium-disable-next-line security/no-assign-params
     function wln(int256 x) internal pure returns (int256) {
         require(x > 0, "logE of negative number");
         require(x <= 10000000000000000000000000000000000000000, "logE only accepts v <= 1e22 * 1e18"); // in order to prevent using safe-math
         int256 r = 0;
-        uint8 extra_digits = longer_digits - fixed_digits;
-        int256 t = int256(uint256(10)**uint256(extra_digits));
+        uint8 extraDigits = LONGER_DIGITS - FIXED_DIGITS;
+        int256 t = int256(uint256(10)**uint256(extraDigits));
 
-        while (x <= fixed_1 / 10) {
+        while (x <= FIXED_1 / 10) {
             x = x * 10;
-            r -= longer_fixed_log_e_10;
+            r -= LONGER_FIXED_LOG_E_10;
         }
-        while (x >= 10 * fixed_1) {
+        while (x >= 10 * FIXED_1) {
             x = x / 10;
-            r += longer_fixed_log_e_10;
+            r += LONGER_FIXED_LOG_E_10;
         }
-        while (x < fixed_1) {
-            x = wmul(x, fixed_e);
-            r -= longer_fixed_1;
+        while (x < FIXED_1) {
+            x = wmul(x, FIXED_E);
+            r -= LONGER_FIXED_1;
         }
-        while (x > fixed_e) {
-            x = wdiv(x, fixed_e);
-            r += longer_fixed_1;
+        while (x > FIXED_E) {
+            x = wdiv(x, FIXED_E);
+            r += LONGER_FIXED_1;
         }
-        if (x == fixed_1) {
+        if (x == FIXED_1) {
             return roundHalfUp(r, t) / t;
         }
-        if (x == fixed_e) {
-            return fixed_1 + roundHalfUp(r, t) / t;
+        if (x == FIXED_E) {
+            return FIXED_1 + roundHalfUp(r, t) / t;
         }
         x *= t;
 
@@ -202,17 +186,17 @@ library LibMathSigned {
         // Ln(v) = Ln(a) + ---(-----)^1  + ---(-----)^3 + ---(-----)^5 + ...
         //                  1   v+a         3   v+a        5   v+a
         // when n = 36, 1 < v < 3.423
-        r = r + longer_fixed_log_e_1_5;
-        int256 a1_5 = (3 * longer_fixed_1) / 2;
-        int256 m = (longer_fixed_1 * (x - a1_5)) / (x + a1_5);
+        r = r + LONGER_FIXED_LOG_E_1_5;
+        int256 a1_5 = (3 * LONGER_FIXED_1) / 2;
+        int256 m = (LONGER_FIXED_1 * (x - a1_5)) / (x + a1_5);
         r = r + 2 * m;
-        int256 m2 = (m * m) / longer_fixed_1;
+        int256 m2 = (m * m) / LONGER_FIXED_1;
         uint8 i = 3;
         while (true) {
-            m = (m * m2) / longer_fixed_1;
+            m = (m * m2) / LONGER_FIXED_1;
             r = r + (2 * m) / int256(i);
             i += 2;
-            if (i >= 3 + 2 * fixed_digits) {
+            if (i >= 3 + 2 * FIXED_DIGITS) {
                 break;
             }
         }
@@ -308,11 +292,11 @@ library LibMathUnsigned {
         r = mul(x, y) / z;
     }
 
-    function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    function min(uint256 x, uint256 y) internal pure returns (uint256) {
         return x <= y ? x : y;
     }
 
-    function max(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    function max(uint256 x, uint256 y) internal pure returns (uint256) {
         return x >= y ? x : y;
     }
 

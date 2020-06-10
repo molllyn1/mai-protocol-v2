@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "./LibEIP712.sol";
@@ -17,8 +17,7 @@ library LibOrder {
         )
     );
 
-    int256 public constant FEE_RATE_BASE = 100000;
-    uint256 public constant ONE = 1e18;
+    int256 public constant FEE_RATE_BASE = 10 ** 5;
 
     struct Order {
         address trader;
@@ -41,7 +40,7 @@ library LibOrder {
          * ║ salt               │ 8               salt                                      ║
          * ║ isMakerOnly        │ 1               is maker only                             ║
          * ║ isInversed         │ 1               is inversed contract                      ║
-         * ║                    │ 8               reserved                                  ║
+         * ║ chainId            │ 8               chain id                                  ║
          * ╚════════════════════╧═══════════════════════════════════════════════════════════╝
          */
         bytes32 data;
@@ -62,12 +61,10 @@ library LibOrder {
     ) internal pure returns (bytes32 orderHash) {
         Order memory order = getOrder(orderParam, perpetual, broker);
         orderHash = LibEIP712.hashEIP712Message(hashOrder(order));
-        return orderHash;
     }
 
     function getOrderHash(Order memory order) internal pure returns (bytes32 orderHash) {
         orderHash = LibEIP712.hashEIP712Message(hashOrder(order));
-        return orderHash;
     }
 
     function getOrder(
@@ -90,17 +87,19 @@ library LibOrder {
             let start := sub(order, 32)
             let tmp := mload(start)
             mstore(start, orderType)
+            // [0...32)   bytes: EIP712_ORDER_TYPE
+            // [32...224) bytes: order
+            // 224 = 32 + 192
             result := keccak256(start, 224)
             mstore(start, tmp)
         }
-        return result;
     }
 
-    function getOrderVersion(OrderParam memory orderParam) internal pure returns (uint256) {
+    function orderVersion(OrderParam memory orderParam) internal pure returns (uint256) {
         return uint256(uint8(bytes1(orderParam.data)));
     }
 
-    function getExpiredAt(OrderParam memory orderParam) internal pure returns (uint256) {
+    function expiredAt(OrderParam memory orderParam) internal pure returns (uint256) {
         return uint256(uint40(bytes5(orderParam.data << (8 * 3))));
     }
 
@@ -110,11 +109,11 @@ library LibOrder {
     }
 
     function getPrice(OrderParam memory orderParam) internal pure returns (uint256) {
-        return isInversed(orderParam) ? ONE.wdiv(orderParam.price) : orderParam.price;
+        return isInversed(orderParam) ? LibMathUnsigned.WAD().wdiv(orderParam.price) : orderParam.price;
     }
 
     function isMarketOrder(OrderParam memory orderParam) internal pure returns (bool) {
-        return uint8(orderParam.data[2]) == 1;
+        return uint8(orderParam.data[2]) > 0;
     }
 
     function isMarketBuy(OrderParam memory orderParam) internal pure returns (bool) {
@@ -122,11 +121,11 @@ library LibOrder {
     }
 
     function isMakerOnly(OrderParam memory orderParam) internal pure returns (bool) {
-        return uint8(orderParam.data[22]) == 1;
+        return uint8(orderParam.data[22]) > 0;
     }
 
     function isInversed(OrderParam memory orderParam) internal pure returns (bool) {
-        return uint8(orderParam.data[23]) == 1;
+        return uint8(orderParam.data[23]) > 0;
     }
 
     function side(OrderParam memory orderParam) internal pure returns (LibTypes.Side) {
@@ -139,5 +138,9 @@ library LibOrder {
 
     function takerFeeRate(OrderParam memory orderParam) internal pure returns (int256) {
         return int256(int16(bytes2(orderParam.data << (8 * 10)))).mul(LibMathSigned.WAD()).div(FEE_RATE_BASE);
+    }
+
+    function chainId(OrderParam memory orderParam) internal pure returns (uint256) {
+        return uint256(uint64(bytes8(orderParam.data << (8 * 24))));
     }
 }

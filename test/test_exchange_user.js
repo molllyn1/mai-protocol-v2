@@ -915,6 +915,8 @@ contract('exchange-user', accounts => {
     });
 
     it("trade", async () => {
+        console.log("+++++++++++++", await exchange.getChainId());
+
         await collateral.transfer(u1, toWad(10000));
         await collateral.approve(perpetual.address, infinity, {
             from: u1
@@ -937,6 +939,8 @@ contract('exchange-user', accounts => {
 
         assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 10000 - 600);
     });
+
+    return;
 
     it("soft fee", async () => {
         await initialize(u1, 720);

@@ -22,6 +22,9 @@ const addLeadingZero = (str, length) => {
 
 const addTailingZero = (str, length) => {
     let len = str.length;
+    if (len == length) {
+        return str;
+    }
     return str + '0'.repeat(length - len);
 };
 
@@ -63,7 +66,8 @@ const generateOrderData = (
     takerFeeRate,
     salt,
     isMakerOnly,
-    isInversed
+    isInversed,
+    chainId
 ) => {
     let res = '0x';
     res += addLeadingZero(new BigNumber(version).toString(16), 2);
@@ -76,6 +80,7 @@ const generateOrderData = (
     res += addLeadingZero(new BigNumber(salt).toString(16), 8 * 2);
     res += isMakerOnly ? '01' : '00';
     res += isInversed ? '01' : '00';
+    res += addLeadingZero(new BigNumber(chainId).toString(16), 8 * 2);
     return addTailingZero(res, 66);
 };
 
@@ -137,7 +142,6 @@ const getExpiredAt = orderParam => {
 };
 
 const buildOrder = async (orderParam, perpetual, broker) => {
-
     const order = {
         trader: orderParam.trader,
         broker: broker,
@@ -154,6 +158,7 @@ const buildOrder = async (orderParam, perpetual, broker) => {
             orderParam.salt || 10000000,
             orderParam.makerOnly || false,
             orderParam.inversed || false,
+            orderParam.chainId || 1
         ),
     };
     await getOrderSignature(order);
@@ -176,11 +181,11 @@ const buildOrderEx = async (orderParam, perpetual, broker) => {
             orderParam.makerFeeRate || 0,
             orderParam.takerFeeRate || 0,
             orderParam.salt || 10000000,
-            false,
+            orderParam.inversed || false,
+            orderParam.chainId || 1
         ),
     };
     await getOrderSignature(order);
-    console.log(order);
     return order;
 };
 

@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../perpetual/Perpetual.sol";
@@ -10,20 +10,16 @@ contract TestPerpetual is Perpetual {
         Perpetual(_globalConfig, _devAddress, collateral, collateralDecimals)
     {}
 
-    function addSocialLossPerContractPublic(LibTypes.Side side, int256 value) public {
-        addSocialLossPerContract(side, value);
-    }
-
     function transferCashBalancePublic(address from, address to, uint256 amount) public {
         transferCashBalance(from, to, amount);
     }
 
-    function forceSetCollateral(address guy, LibTypes.CollateralAccount memory value) public {
-        cashBalances[guy] = value;
+    function forceSetCollateral(address trader, LibTypes.MarginAccount memory value) public {
+        marginAccounts[trader] = value;
     }
 
-    function forceSetPosition(address guy, LibTypes.PositionAccount memory value) public {
-        positions[guy] = value;
+    function forceSetPosition(address trader, LibTypes.MarginAccount memory value) public {
+        marginAccounts[trader] = value;
     }
 
     function forceSetTotalSize(uint256 value) public {

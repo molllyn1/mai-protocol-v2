@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibOrder.sol";
@@ -35,8 +35,8 @@ contract TestOrder {
         return order.getOrderHash();
     }
 
-    function getOrderExpiredAt(LibOrder.OrderParam memory orderParam) public pure returns (uint256) {
-        return orderParam.getExpiredAt();
+    function expiredAt(LibOrder.OrderParam memory orderParam) public pure returns (uint256) {
+        return orderParam.expiredAt();
     }
 
     function isValidSignature(LibOrder.OrderParam memory orderParam, bytes32 orderHash) public pure returns (bool) {
@@ -77,5 +77,9 @@ contract TestOrder {
 
     function takerFeeRate(LibOrder.OrderParam memory orderParam) public pure returns (int256) {
         return orderParam.takerFeeRate();
+    }
+
+    function chainId(LibOrder.OrderParam memory orderParam) public pure returns (uint256) {
+        return orderParam.chainId();
     }
 }

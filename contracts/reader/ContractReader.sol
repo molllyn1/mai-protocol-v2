@@ -1,4 +1,4 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibTypes.sol";
@@ -30,9 +30,9 @@ contract ContractReader {
     }
 
     struct AccountStorage {
-        LibTypes.CollateralAccount collateral;
-        LibTypes.PositionAccount position;
-        LibTypes.Broker broker;
+        LibTypes.MarginAccount margin;
+        LibTypes.DelayedVariable broker;
+        LibTypes.DelayedVariable withdrawalLock;
     }
 
     function getGovParams(address perpetualAddress) public view returns (GovParams memory params) {
@@ -63,14 +63,14 @@ contract ContractReader {
         params.fundingParams = perpetual.amm().lastFundingState();
     }
 
-    function getAccountStorage(address perpetualAddress, address guy)
+    function getAccountStorage(address perpetualAddress, address trader)
         public
         view
         returns (AccountStorage memory params)
     {
         IPerpetual perpetual = IPerpetual(perpetualAddress);
-        params.collateral = perpetual.getCashBalance(guy);
-        params.position = perpetual.getPosition(guy);
-        params.broker = perpetual.getBroker(guy);
+        params.margin = perpetual.getMarginAccount(trader);
+        params.broker = perpetual.getBroker(trader);
+        params.withdrawalLock = perpetual.getWithdrawalLock(trader);
     }
 }

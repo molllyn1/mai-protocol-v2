@@ -1,21 +1,20 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameters
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
-import "../lib/LibOrder.sol";
+
 import "../lib/LibTypes.sol";
-import "./AMMGovernance.sol";
 import "../interface/IPriceFeeder.sol";
 import "../interface/IPerpetualProxy.sol";
 import "../token/ShareToken.sol";
+import "./AMMGovernance.sol";
 
 
 contract AMM is AMMGovernance {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
-    uint256 private constant ONE_WAD_U = 10**18;
-    int256 private constant ONE_WAD_S = 10**18;
+    int256 private constant FUNDING_PERIOD = 28800; // 8 * 3600;
 
     // interfaces
     ShareToken private shareToken;
@@ -28,22 +27,12 @@ contract AMM is AMMGovernance {
     event CreateAMM();
     event UpdateFundingRate(LibTypes.FundingState fundingState);
 
-    modifier onlyBroker() {
-        require(perpetualProxy.currentBroker(msg.sender) == authorizedBroker(), "invalid broker");
-        _;
-    }
-
     constructor(address _perpetualProxy, address _priceFeeder, address _shareToken) public {
         priceFeeder = IPriceFeeder(_priceFeeder);
         perpetualProxy = IPerpetualProxy(_perpetualProxy);
         shareToken = ShareToken(_shareToken);
 
         emit CreateAMM();
-    }
-
-    // view functions
-    function authorizedBroker() internal view returns (address) {
-        return address(perpetualProxy);
     }
 
     function shareTokenAddress() public view returns (address) {
@@ -151,9 +140,10 @@ contract AMM is AMMGovernance {
     }
 
     function createPool(uint256 amount) public {
+        require(amount > 0, "amount must be greater than zero");
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(positionSize() == 0, "pool not empty");
-        require(amount.mod(perpetualProxy.lotSize()) == 0, "invalid lot size");
+        require(amount.mod(perpetualProxy.lotSize()) == 0, "amount must be divisible by lotSize");
 
         address trader = msg.sender;
         uint256 blockTime = getBlockTimestamp();
@@ -208,7 +198,7 @@ contract AMM is AMMGovernance {
         return buyFrom(trader, amount, limitPrice, deadline);
     }
 
-    function buy(uint256 amount, uint256 limitPrice, uint256 deadline) public onlyBroker returns (uint256) {
+    function buy(uint256 amount, uint256 limitPrice, uint256 deadline) public returns (uint256) {
         return buyFrom(msg.sender, amount, limitPrice, deadline);
     }
 
@@ -249,12 +239,12 @@ contract AMM is AMMGovernance {
         return sellFrom(trader, amount, limitPrice, deadline);
     }
 
-    function sell(uint256 amount, uint256 limitPrice, uint256 deadline) public onlyBroker returns (uint256) {
+    function sell(uint256 amount, uint256 limitPrice, uint256 deadline) public returns (uint256) {
         return sellFrom(msg.sender, amount, limitPrice, deadline);
     }
 
     // sell amount, pay 2 * amount * price collateral
-    function addLiquidity(uint256 amount) public onlyBroker {
+    function addLiquidity(uint256 amount) public {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(amount.mod(perpetualProxy.lotSize()) == 0, "invalid lot size");
 
@@ -276,7 +266,7 @@ contract AMM is AMMGovernance {
         mustSafe(trader, opened);
     }
 
-    function removeLiquidity(uint256 shareAmount) public onlyBroker {
+    function removeLiquidity(uint256 shareAmount) public {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
 
         address trader = msg.sender;
@@ -312,7 +302,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.setBroker + perp.deposit + amm.buy
     // composite functions accept amount = 0
     function depositAndBuy(uint256 depositAmount, uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (depositAmount > 0) {
             perpetualProxy.depositFor(msg.sender, depositAmount);
         }
@@ -324,7 +313,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.setBroker + perp.depositEther + amm.buy
     // composite functions accept amount = 0
     function depositEtherAndBuy(uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public payable {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (msg.value > 0) {
             perpetualProxy.depositEtherFor.value(msg.value)(msg.sender);
         }
@@ -336,7 +324,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.setBroker + perp.deposit + amm.sell
     // composite functions accept amount = 0
     function depositAndSell(uint256 depositAmount, uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (depositAmount > 0) {
             perpetualProxy.depositFor(msg.sender, depositAmount);
         }
@@ -348,7 +335,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.setBroker + perp.depositEther + amm.sell
     // composite functions accept amount = 0
     function depositEtherAndSell(uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public payable {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (msg.value > 0) {
             perpetualProxy.depositEtherFor.value(msg.value)(msg.sender);
         }
@@ -360,7 +346,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.setBroker + amm.buy + perp.withdraw
     // composite functions accept amount = 0
     function buyAndWithdraw(uint256 tradeAmount, uint256 limitPrice, uint256 deadline, uint256 withdrawAmount) public {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (tradeAmount > 0) {
             buy(tradeAmount, limitPrice, deadline);
         }
@@ -372,7 +357,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.setBroker + amm.sell + perp.withdraw
     // composite functions accept amount = 0
     function sellAndWithdraw(uint256 tradeAmount, uint256 limitPrice, uint256 deadline, uint256 withdrawAmount) public {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (tradeAmount > 0) {
             sell(tradeAmount, limitPrice, deadline);
         }
@@ -384,7 +368,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.deposit + perp.setBroker + amm.addLiquidity
     // composite functions accept amount = 0
     function depositAndAddLiquidity(uint256 depositAmount, uint256 amount) public {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (depositAmount > 0) {
             perpetualProxy.depositFor(msg.sender, depositAmount);
         }
@@ -396,7 +379,6 @@ contract AMM is AMMGovernance {
     // this is a composite function of perp.deposit + perp.setBroker + amm.addLiquidity
     // composite functions accept amount = 0
     function depositEtherAndAddLiquidity(uint256 amount) public payable {
-        perpetualProxy.setBrokerFor(msg.sender, authorizedBroker());
         if (msg.value > 0) {
             perpetualProxy.depositEtherFor.value(msg.value)(msg.sender);
         }
@@ -416,7 +398,7 @@ contract AMM is AMMGovernance {
     }
 
     function initFunding(uint256 newIndexPrice, uint256 blockTime) private {
-        require(fundingState.lastFundingTime == 0, "initalready initialized");
+        require(fundingState.lastFundingTime == 0, "already initialized");
         fundingState.lastFundingTime = blockTime;
         fundingState.lastIndexPrice = newIndexPrice;
         fundingState.lastPremium = 0;
@@ -497,12 +479,12 @@ contract AMM is AMMGovernance {
         require(perpetualProxy.isProxySafeWithPrice(perpetualMarkPrice), "amm unsafe");
     }
 
-    function mintShareTokenTo(address guy, uint256 amount) internal {
-        shareToken.mint(guy, amount);
+    function mintShareTokenTo(address trader, uint256 amount) internal {
+        require(shareToken.mint(trader, amount), "mint failed");
     }
 
-    function burnShareTokenFrom(address guy, uint256 amount) internal {
-        shareToken.burn(guy, amount);
+    function burnShareTokenFrom(address trader, uint256 amount) internal {
+        require(shareToken.burn(trader, amount), "burn failed");
     }
 
     function forceFunding() internal {
@@ -551,7 +533,7 @@ contract AMM is AMMGovernance {
                 fundingState.lastIndexPrice.toInt256() // ema is according to the old index
             );
             fundingState.accumulatedFundingPerContract = fundingState.accumulatedFundingPerContract.add(
-                acc.div(8 * 3600)
+                acc.div(FUNDING_PERIOD)
             ); // ema is according to the old index
             fundingState.lastFundingTime = endTimestamp;
         }
@@ -577,10 +559,10 @@ contract AMM is AMMGovernance {
         t = y.sub(_lastPremium);
         t = t.wdiv(v0.sub(_lastPremium));
         require(t > 0, "no solution 2 on funding curve");
-        require(t < ONE_WAD_S, "no solution 3 on funding curve");
+        require(t < LibMathSigned.WAD(), "no solution 3 on funding curve");
         t = t.wln();
         t = t.wdiv(emaAlpha2Ln);
-        t = t.ceil(ONE_WAD_S) / ONE_WAD_S;
+        t = t.ceil(LibMathSigned.WAD()) / LibMathSigned.WAD();
     }
 
     // sum emaPremium curve between [x, y)

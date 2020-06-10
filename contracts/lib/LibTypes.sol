@@ -1,8 +1,5 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
-
-import "./LibOrder.sol";
-
 
 library LibTypes {
     enum Side {FLAT, SHORT, LONG}
@@ -32,33 +29,19 @@ library LibTypes {
         uint256 tradingLotSize;
     }
 
-    // CollateralAccount represents cash account of user
-    struct CollateralAccount {
-        // currernt deposited erc20 token amount, representing in decimals 18
-        int256 balance;
-        // the amount of withdrawal applied by user
-        // which allowed to withdraw in the future but not available in trading
-        int256 appliedBalance;
-        // applied balance will be appled only when the block height below is reached
-        uint256 appliedHeight;
-    }
-
-    struct PositionAccount {
+    struct MarginAccount {
         LibTypes.Side side;
         uint256 size;
         uint256 entryValue;
         int256 entrySocialLoss;
         int256 entryFundingLoss;
+        int256 cashBalance;
     }
 
-    struct BrokerRecord {
-        address broker;
-        uint256 appliedHeight;
-    }
-
-    struct Broker {
-        BrokerRecord previous;
-        BrokerRecord current;
+    struct DelayedVariable {
+        bytes32 previousValue;
+        bytes32 currentValue;
+        uint256 blockHeight;
     }
 
     //////////////////////////////////////////////////////////////////////////

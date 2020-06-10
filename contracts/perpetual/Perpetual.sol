@@ -1,51 +1,83 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
-
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "../lib/LibOrder.sol";
 import "../lib/LibTypes.sol";
-import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
+import "../lib/LibMath.sol";
+import "../lib/LibDelayedVariable.sol";
+import "../lib/LibUtils.sol";
 
-import "./Position.sol";
-import "./Brokerage.sol";
+import "./MarginAccount.sol";
 
-import "../interface/IPriceFeeder.sol";
-import "../interface/IGlobalConfig.sol";
-
-
-contract Perpetual is Brokerage, Position {
+contract Perpetual is MarginAccount, ReentrancyGuard  {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
     using LibOrder for LibTypes.Side;
-    using SafeERC20 for IERC20;
+    using LibDelayedVariable for LibTypes.DelayedVariable;
+    using LibUtils for address;
+    using LibUtils for bytes32;
+
     uint256 public totalAccounts;
     address[] public accountList;
     mapping(address => bool) private accountCreated;
 
     event CreatePerpetual();
-    event CreateAccount(uint256 indexed id, address indexed guy);
-    event Buy(address indexed guy, uint256 price, uint256 amount);
-    event Sell(address indexed guy, uint256 price, uint256 amount);
-    event Liquidate(address indexed keeper, address indexed guy, uint256 price, uint256 amount);
+    event CreateAccount(uint256 indexed id, address indexed trader);
+    event Buy(address indexed trader, uint256 price, uint256 amount);
+    event Sell(address indexed trader, uint256 price, uint256 amount);
+    event Liquidate(address indexed keeper, address indexed trader, uint256 price, uint256 amount);
     event EndGlobalSettlement();
+    event BrokerUpdate(address indexed account, address indexed guy, uint256 appliedHeight);
 
-    constructor(address globalConfig, address devAddress, address collateral, uint256 collateralDecimals)
+    constructor(address _globalConfig, address _devAddress, address _collateral, uint256 _collateralDecimals)
         public
-        Position(collateral, collateralDecimals)
+        MarginAccount(_collateral, _collateralDecimals)
     {
-        setGovernanceAddress("globalConfig", globalConfig);
-        setGovernanceAddress("dev", devAddress);
+        setGovernanceAddress("globalConfig", _globalConfig);
+        setGovernanceAddress("dev", _devAddress);
+
         emit CreatePerpetual();
     }
 
     // Admin functions
-    function setCashBalance(address guy, int256 amount) public onlyWhitelistAdmin {
+    function setCashBalance(address trader, int256 amount) public onlyWhitelistAdmin {
         require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
-        int256 deltaAmount = amount.sub(cashBalances[guy].balance);
-        cashBalances[guy].balance = amount;
-        emit InternalUpdateBalance(guy, deltaAmount, amount);
+        int256 deltaAmount = amount.sub(marginAccounts[trader].cashBalance);
+        marginAccounts[trader].cashBalance = amount;
+        emit InternalUpdateBalance(trader, deltaAmount, amount);
+    }
+
+    function endGlobalSettlement() public onlyWhitelistAdmin {
+        require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+
+        address ammTrader = address(amm.perpetualProxy());
+        settleFor(ammTrader);
+        status = LibTypes.Status.SETTLED;
+
+        emit EndGlobalSettlement();
+    }
+
+    function depositToInsuranceFund(uint256 rawAmount) public {
+        require(rawAmount > 0, "invalid amount");
+        checkDepositingParameter(rawAmount);
+        int256 wadAmount = pullCollateral(msg.sender, rawAmount);
+        insuranceFundBalance = insuranceFundBalance.add(wadAmount);
+        require(insuranceFundBalance >= 0, "negtive insurance fund");
+
+        emit UpdateInsuranceFund(insuranceFundBalance);
+    }
+
+    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyWhitelistAdmin {
+        require(rawAmount > 0, "invalid amount");
+        require(insuranceFundBalance > 0, "insufficient funds");
+
+        int256 wadAmount = toWad(rawAmount);
+        require(wadAmount <= insuranceFundBalance, "insufficient funds");
+        insuranceFundBalance = insuranceFundBalance.sub(wadAmount);
+        pushCollateral(msg.sender, rawAmount);
+        require(insuranceFundBalance >= 0, "negtive insurance fund");
+
+        emit UpdateInsuranceFund(insuranceFundBalance);
     }
 
     // Public functions
@@ -57,238 +89,146 @@ contract Perpetual is Brokerage, Position {
         return status == LibTypes.Status.NORMAL ? amm.currentMarkPrice() : settlementPrice;
     }
 
-    function setBroker(address broker) public {
-        setBroker(msg.sender, broker, globalConfig.brokerLockBlockCount());
+    function setBroker(address newBroker) public {
+        setBrokerFor(msg.sender, newBroker);
     }
 
-    function setBrokerFor(address guy, address broker) public onlyWhitelisted {
-        setBroker(guy, broker, globalConfig.brokerLockBlockCount());
-    }
-
-    function depositToAccount(address guy, uint256 amount) private {
-        require(guy != address(0), "invalid guy");
-        deposit(guy, amount);
-
-        // append to the account list. make the account trackable
-        if (!accountCreated[guy]) {
-            emit CreateAccount(totalAccounts, guy);
-            accountList.push(guy);
-            totalAccounts++;
-            accountCreated[guy] = true;
+    function setBrokerFor(address trader, address newBroker) public onlyWhitelisted {
+        if (currentBroker(trader) != newBroker) {
+            brokers[trader].setValueDelayed(newBroker.toBytes32(), globalConfig.brokerLockBlockCount());
+            emit BrokerUpdate(trader, newBroker, brokers[trader].blockHeight);
         }
     }
 
-    function depositFor(address guy, uint256 amount) public onlyWhitelisted {
-        require(isTokenizedCollateral(), "token not acceptable");
-
-        depositToAccount(guy, amount);
+    // Deposit && Withdraw
+    function deposit(uint256 rawAmount) public {
+        checkDepositingParameter(rawAmount);
+        depositToAccount(msg.sender, rawAmount);
     }
 
-    function depositEtherFor(address guy) public payable onlyWhitelisted {
-        require(!isTokenizedCollateral(), "ether not acceptable");
-
-        depositToAccount(guy, msg.value);
-    }
-
-    function deposit(uint256 amount) public {
-        require(isTokenizedCollateral(), "token not acceptable");
-
-        depositToAccount(msg.sender, amount);
-    }
-
-    function depositEther() public payable {
-        require(!isTokenizedCollateral(), "ether not acceptable");
-
-        depositToAccount(msg.sender, msg.value);
-    }
-
-    // this is a composite function of perp.deposit + perp.setBroker
-    // composite functions accept amount = 0
-    function depositAndSetBroker(uint256 amount, address broker) public {
-        setBroker(broker);
-        if (amount > 0) {
-            deposit(amount);
-        }
-    }
-
-    // this is a composite function of perp.deposit + perp.setBroker
-    // composite functions accept amount = 0
-    function depositEtherAndSetBroker(address broker) public payable {
-        setBroker(broker);
-        if (msg.value > 0) {
-            depositEther();
-        }
-    }
-
-    function applyForWithdrawal(uint256 amount) public {
-        applyForWithdrawal(msg.sender, amount, globalConfig.withdrawalLockBlockCount());
-    }
-
-    function settleFor(address guy) private {
-        uint256 currentMarkPrice = markPrice();
-        LibTypes.PositionAccount memory account = positions[guy];
-        if (account.size > 0) {
-            int256 pnl = close(account, currentMarkPrice, account.size);
-            updateBalance(guy, pnl);
-            positions[guy] = account;
-        }
-        emit UpdatePositionAccount(guy, account, totalSize(LibTypes.Side.LONG), currentMarkPrice);
-    }
-
-    function settle() public {
-        require(status == LibTypes.Status.SETTLED, "wrong perpetual status");
-
-        address payable guy = msg.sender;
-        settleFor(guy);
-        withdrawAll(guy);
-    }
-
-    function endGlobalSettlement() public onlyWhitelistAdmin {
-        require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
-
-        address guy = address(amm.perpetualProxy());
-        settleFor(guy);
-        status = LibTypes.Status.SETTLED;
-
-        emit EndGlobalSettlement();
-    }
-
-    function withdrawFromAccount(address payable guy, uint256 amount) private {
-        require(guy != address(0), "invalid guy");
-        require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
-
-        uint256 currentMarkPrice = markPrice();
-        require(isSafeWithPrice(guy, currentMarkPrice), "unsafe before withdraw");
-        remargin(guy, currentMarkPrice);
-        address broker = currentBroker(guy);
-        bool forced = broker == address(amm.perpetualProxy()) || broker == address(0);
-        withdraw(guy, amount, forced);
-
-        require(isSafeWithPrice(guy, currentMarkPrice), "unsafe after withdraw");
-        require(availableMarginWithPrice(guy, currentMarkPrice) >= 0, "withdraw margin");
-    }
-
-    function withdrawFor(address payable guy, uint256 amount) public onlyWhitelisted {
-        withdrawFromAccount(guy, amount);
+    function applyForWithdrawal(uint256 rawAmount) public {
+        Collateral.applyForWithdrawal(msg.sender, rawAmount, globalConfig.withdrawalLockBlockCount());
     }
 
     function withdraw(uint256 amount) public {
         withdrawFromAccount(msg.sender, amount);
     }
 
-    function depositToInsuranceFund(uint256 rawAmount) public {
-        require(isTokenizedCollateral(), "token not acceptable");
-        require(rawAmount > 0, "invalid amount");
+    function settle() public nonReentrant {
+        require(status == LibTypes.Status.SETTLED, "wrong perpetual status");
 
-        int256 wadAmount = depositToProtocol(msg.sender, rawAmount);
-        insuranceFundBalance = insuranceFundBalance.add(wadAmount);
-        require(insuranceFundBalance >= 0, "negtive insurance fund");
-
-        emit UpdateInsuranceFund(insuranceFundBalance);
+        address payable trader = msg.sender;
+        settleFor(trader);
+        int256 wadAmount = marginAccounts[trader].cashBalance;
+        if (wadAmount <= 0) {
+            return;
+        }
+        uint256 rawAmount = toCollateral(wadAmount);
+        withdraw(trader, rawAmount, true);
     }
 
-    function depositEtherToInsuranceFund() public payable {
-        require(!isTokenizedCollateral(), "ether not acceptable");
-        require(msg.value > 0, "invalid amount");
-
-        int256 wadAmount = depositToProtocol(msg.sender, msg.value);
-        insuranceFundBalance = insuranceFundBalance.add(wadAmount);
-
-        require(insuranceFundBalance >= 0, "negtive insurance fund");
-
-        emit UpdateInsuranceFund(insuranceFundBalance);
+    // this is a composite function of perp.deposit + perp.setBroker
+    // composite functions accept amount = 0
+    function depositAndSetBroker(uint256 amount, address broker) public payable {
+        setBroker(broker);
+        deposit(amount);
     }
 
-    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyWhitelistAdmin {
-        require(rawAmount > 0, "invalid amount");
-        require(insuranceFundBalance > 0, "insufficient funds");
-        require(rawAmount <= insuranceFundBalance.toUint256(), "insufficient funds");
-
-        int256 wadAmount = toWad(rawAmount);
-        insuranceFundBalance = insuranceFundBalance.sub(wadAmount);
-        withdrawFromProtocol(msg.sender, rawAmount);
-
-        require(insuranceFundBalance >= 0, "negtive insurance fund");
-
-        emit UpdateInsuranceFund(insuranceFundBalance);
+    // Whitelisted Only
+    function depositFor(address trader, uint256 rawAmount) public payable onlyWhitelisted {
+        checkDepositingParameter(rawAmount);
+        depositToAccount(trader, rawAmount);
     }
 
-    function positionMargin(address guy) public returns (uint256) {
-        return Position.marginWithPrice(guy, markPrice());
+    function withdrawFor(address payable trader, uint256 amount) public onlyWhitelisted {
+        withdrawFromAccount(trader, amount);
     }
 
-    function maintenanceMargin(address guy) public returns (uint256) {
-        return maintenanceMarginWithPrice(guy, markPrice());
-    }
-
-    function marginBalance(address guy) public returns (int256) {
-        return marginBalanceWithPrice(guy, markPrice());
-    }
-
-    function pnl(address guy) public returns (int256) {
-        return pnlWithPrice(guy, markPrice());
-    }
-
-    function availableMargin(address guy) public returns (int256) {
-        return availableMarginWithPrice(guy, markPrice());
-    }
-
-    function drawableBalance(address guy) public returns (int256) {
-        return drawableBalanceWithPrice(guy, markPrice());
-    }
-
-    // safe for liquidation
-    function isSafe(address guy) public returns (bool) {
+    function settleFor(address trader) private {
         uint256 currentMarkPrice = markPrice();
-        return isSafeWithPrice(guy, currentMarkPrice);
+        LibTypes.MarginAccount memory account = marginAccounts[trader];
+        if (account.size > 0) {
+            int256 pnl = close(account, currentMarkPrice, account.size);
+            updateBalance(trader, pnl);
+            marginAccounts[trader] = account;
+        }
+        emit UpdatePositionAccount(trader, account, totalSize(LibTypes.Side.LONG), currentMarkPrice);
+    }
+
+    function positionMargin(address trader) public returns (uint256) {
+        return MarginAccount.marginWithPrice(trader, markPrice());
+    }
+
+    function maintenanceMargin(address trader) public returns (uint256) {
+        return maintenanceMarginWithPrice(trader, markPrice());
+    }
+
+    function marginBalance(address trader) public returns (int256) {
+        return marginBalanceWithPrice(trader, markPrice());
+    }
+
+    function pnl(address trader) public returns (int256) {
+        return pnlWithPrice(trader, markPrice());
+    }
+
+    function availableMargin(address trader) public returns (int256) {
+        return availableMarginWithPrice(trader, markPrice());
+    }
+
+    function drawableBalance(address trader) public returns (int256) {
+        return drawableBalanceWithPrice(trader, markPrice());
     }
 
     // safe for liquidation
-    function isSafeWithPrice(address guy, uint256 currentMarkPrice) public returns (bool) {
+    function isSafe(address trader) public returns (bool) {
+        uint256 currentMarkPrice = markPrice();
+        return isSafeWithPrice(trader, currentMarkPrice);
+    }
+
+    // safe for liquidation
+    function isSafeWithPrice(address trader, uint256 currentMarkPrice) public returns (bool) {
         return
-            marginBalanceWithPrice(guy, currentMarkPrice) >=
-            maintenanceMarginWithPrice(guy, currentMarkPrice).toInt256();
+            marginBalanceWithPrice(trader, currentMarkPrice) >=
+            maintenanceMarginWithPrice(trader, currentMarkPrice).toInt256();
     }
 
-    function isBankrupt(address guy) public returns (bool) {
-        return marginBalanceWithPrice(guy, markPrice()) < 0;
+    function isBankrupt(address trader) public returns (bool) {
+        return marginBalanceWithPrice(trader, markPrice()) < 0;
     }
 
     // safe for opening positions
-    function isIMSafe(address guy) public returns (bool) {
+    function isIMSafe(address trader) public returns (bool) {
         uint256 currentMarkPrice = markPrice();
-        return isIMSafeWithPrice(guy, currentMarkPrice);
+        return isIMSafeWithPrice(trader, currentMarkPrice);
     }
 
     // safe for opening positions
-    function isIMSafeWithPrice(address guy, uint256 currentMarkPrice) public returns (bool) {
-        return availableMarginWithPrice(guy, currentMarkPrice) >= 0;
+    function isIMSafeWithPrice(address trader, uint256 currentMarkPrice) public returns (bool) {
+        return availableMarginWithPrice(trader, currentMarkPrice) >= 0;
     }
 
-    function liquidateFrom(address from, address guy, uint256 maxAmount) public returns (uint256, uint256) {
+    function liquidate(address trader, uint256 maxAmount) public returns (uint256, uint256) {
+        require(msg.sender != trader, "self liquidate");
         require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
         require(maxAmount.mod(governance.lotSize) == 0, "invalid lot size");
-        require(!isSafe(guy), "safe account");
+        require(!isSafe(trader), "safe account");
 
         uint256 liquidationPrice = markPrice();
-        uint256 liquidationAmount = calculateLiquidateAmount(guy, liquidationPrice);
-        uint256 totalPositionSize = positions[guy].size;
+        require(liquidationPrice > 0, "invalid price");
+        uint256 liquidationAmount = calculateLiquidateAmount(trader, liquidationPrice);
+        uint256 totalPositionSize = marginAccounts[trader].size;
         uint256 liquidatableAmount = totalPositionSize.sub(totalPositionSize.mod(governance.lotSize));
         liquidationAmount = liquidationAmount.ceil(governance.lotSize).min(maxAmount).min(liquidatableAmount);
         require(liquidationAmount > 0, "nothing to liquidate");
 
-        uint256 opened = liquidate(from, guy, liquidationPrice, liquidationAmount);
+        uint256 opened = MarginAccount.liquidate(msg.sender, trader, liquidationPrice, liquidationAmount);
         if (opened > 0) {
-            require(availableMarginWithPrice(from, liquidationPrice) >= 0, "liquidator margin");
+            require(availableMarginWithPrice(msg.sender, liquidationPrice) >= 0, "liquidator margin");
         } else {
-            require(isSafe(from), "liquidator unsafe");
+            require(isSafe(msg.sender), "liquidator unsafe");
         }
-
-        emit Liquidate(from, guy, liquidationPrice, liquidationAmount);
-    }
-
-    function liquidate(address guy, uint256 maxAmount) public returns (uint256, uint256) {
-        return liquidateFrom(msg.sender, guy, maxAmount);
+        emit Liquidate(msg.sender, trader, liquidationPrice, liquidationAmount);
+        return (liquidationPrice, liquidationAmount);
     }
 
     function tradePosition(address trader, LibTypes.Side side, uint256 price, uint256 amount)
@@ -299,7 +239,7 @@ contract Perpetual is Brokerage, Position {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
 
-        uint256 opened = Position.trade(trader, side, price, amount);
+        uint256 opened = MarginAccount.trade(trader, side, price, amount);
         if (side == LibTypes.Side.LONG) {
             emit Buy(trader, price, amount);
         } else if (side == LibTypes.Side.SHORT) {
@@ -311,5 +251,47 @@ contract Perpetual is Brokerage, Position {
     function transferCashBalance(address from, address to, uint256 amount) public onlyWhitelisted {
         require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
         transferBalance(from, to, amount.toInt256());
+    }
+
+    function registerNewTrader(address trader) internal {
+        emit CreateAccount(totalAccounts, trader);
+        accountList.push(trader);
+        totalAccounts++;
+        accountCreated[trader] = true;
+    }
+
+    function checkDepositingParameter(uint256 rawAmount) internal view {
+        bool isToken = isTokenizedCollateral();
+        require(
+            (isToken && msg.value == 0) || (!isToken && msg.value == rawAmount),
+            "invalid depositing parameter"
+        );
+    }
+
+    function depositToAccount(address trader, uint256 rawAmount) private nonReentrant {
+        require(rawAmount > 0, "invalid amount");
+        require(trader != address(0), "invalid trader");
+
+        Collateral.deposit(trader, rawAmount);
+        // append to the account list. make the account trackable
+        if (!accountCreated[trader]) {
+            registerNewTrader(trader);
+        }
+    }
+
+    function withdrawFromAccount(address payable trader, uint256 amount) private nonReentrant {
+        require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
+        require(trader != address(0), "invalid trader");
+
+        uint256 currentMarkPrice = markPrice();
+        require(isSafeWithPrice(trader, currentMarkPrice), "unsafe before withdraw");
+
+        remargin(trader, currentMarkPrice);
+        address broker = currentBroker(trader);
+        bool forced = (broker == address(0));
+        Collateral.withdraw(trader, amount, forced);
+
+        require(isSafeWithPrice(trader, currentMarkPrice), "unsafe after withdraw");
+        require(availableMarginWithPrice(trader, currentMarkPrice) >= 0, "withdraw margin");
     }
 }

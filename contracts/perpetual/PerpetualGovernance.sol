@@ -1,39 +1,21 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "@openzeppelin/contracts/access/roles/WhitelistedRole.sol";
 
-import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
+import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
+import "./PerpetualStorage.sol";
 
-import "../interface/IAMM.sol";
-import "../interface/IGlobalConfig.sol";
-
-
-contract PerpetualGovernance is WhitelistedRole {
-    using LibMathSigned for int256;
-    using LibMathUnsigned for uint256;
-
-    IGlobalConfig public globalConfig;
-    IAMM public amm;
-    address public devAddress;
-
-    LibTypes.Status public status;
-    uint256 public settlementPrice;
-    LibTypes.PerpGovernanceConfig internal governance;
-    int256[3] internal socialLossPerContracts;
+contract PerpetualGovernance is PerpetualStorage {
 
     event BeginGlobalSettlement(uint256 price);
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
     event UpdateGovernanceAddress(bytes32 indexed key, address value);
 
     modifier ammRequired() {
-        require(address(amm) != address(0x0), "no automated market maker");
+        require(address(amm) != address(0), "no automated market maker");
         _;
-    }
-
-    function getGovernance() public view returns (LibTypes.PerpGovernanceConfig memory) {
-        return governance;
     }
 
     function setGovernanceParameter(bytes32 key, int256 value) public onlyWhitelistAdmin {
@@ -80,7 +62,7 @@ contract PerpetualGovernance is WhitelistedRole {
     }
 
     function setGovernanceAddress(bytes32 key, address value) public onlyWhitelistAdmin {
-        require(value != address(0x0), "invalid address");
+        require(value != address(0), "invalid address");
         if (key == "dev") {
             devAddress = value;
         } else if (key == "amm") {

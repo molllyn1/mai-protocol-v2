@@ -1,14 +1,8 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 
 
 library LibEIP712 {
     string internal constant DOMAIN_NAME = "Mai Protocol";
-
-    struct OrderSignature {
-        bytes32 config;
-        bytes32 r;
-        bytes32 s;
-    }
 
     /**
      * Hash of the EIP712 Domain Separator Schema

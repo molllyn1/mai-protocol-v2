@@ -1,6 +1,6 @@
 const BigNumber = require('bignumber.js')
 const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
-const InversedChainlinkAdapter = artifacts.require('oracle/InversedChainlinkAdapter.sol');
+const ChainlinkAdapter = artifacts.require('oracle/ChainlinkAdapter.sol');
 const { fromWad } = require('../test/constants');
 
 module.exports = async function (deployer, network, accounts) {
@@ -22,8 +22,14 @@ module.exports = async function (deployer, network, accounts) {
     await deployer.deploy(PriceFeeder);
 
     const priceFeeder = await PriceFeeder.deployed();
+
+    await deployer.deploy(ChainlinkAdapter, priceFeeder.address, 3600 * 6, true, { gas: 650000 });
+    const chainlinkAdapter = await ChainlinkAdapter.deployed();
+
     console.log('  「 Address summary 」--------------------------------------');
-    console.log('   > priceFeeder:    ', priceFeeder.address);
+    console.log('   > priceFeeder:     ', priceFeeder.address);
+    console.log('   > ChainlinkAdapter:', chainlinkAdapter.address);
+
 
     console.log('feed price (test only)...');
     const price = (new BigNumber('1')).div('120').shiftedBy(18).dp(0, BigNumber.ROUND_DOWN);

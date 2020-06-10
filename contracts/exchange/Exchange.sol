@@ -1,7 +1,8 @@
-pragma solidity 0.5.8;
+pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibMath.sol";
+
 import "../lib/LibOrder.sol";
 import "../lib/LibSignature.sol";
 import "../interface/IPerpetual.sol";
@@ -37,6 +38,7 @@ contract Exchange {
         address _perpetual,
         uint256[] memory amounts
     ) public {
+        require(amounts.length > 0 && makerOrderParams.length == amounts.length, "no makers to match");
         require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
 
         IPerpetual perpetual = IPerpetual(_perpetual);
@@ -137,15 +139,16 @@ contract Exchange {
         // trading with pool
         uint256 takerOpened;
         uint256 price = takerOrderParam.getPrice();
+        uint256 expired = takerOrderParam.expiredAt();
         if (takerOrderParam.isSell()) {
             takerOpened = amm.sellFromWhitelisted(
                 takerOrderParam.trader,
                 amount,
                 price,
-                takerOrderParam.getExpiredAt()
+                expired
             );
         } else {
-            takerOpened = amm.buyFromWhitelisted(takerOrderParam.trader, amount, price, takerOrderParam.getExpiredAt());
+            takerOpened = amm.buyFromWhitelisted(takerOrderParam.trader, amount, price, expired);
         }
         filled[takerOrderHash] = filled[takerOrderHash].add(amount);
 
@@ -164,6 +167,12 @@ contract Exchange {
         require(takerOrderParam.isSell() ? takerPrice <= makerPrice : takerPrice >= makerPrice, "price not match");
     }
 
+    function getChainId() internal pure returns (uint256 id) {
+        assembly {
+            id := chainid()
+        }
+    }
+
     function validateOrderParam(IPerpetual perpetual, LibOrder.OrderParam memory orderParam)
         internal
         view
@@ -171,8 +180,9 @@ contract Exchange {
     {
         address broker = perpetual.currentBroker(orderParam.trader);
         require(broker == msg.sender, "invalid broker");
-        require(orderParam.getOrderVersion() == 2, "unsupported version");
-        require(orderParam.getExpiredAt() >= block.timestamp, "order expired");
+        require(orderParam.orderVersion() == SUPPORTED_ORDER_VERSION, "unsupported version");
+        require(orderParam.expiredAt() >= block.timestamp, "order expired");
+        require(orderParam.chainId() == getChainId(), "unmatched chainid");
 
         bytes32 orderHash = orderParam.getOrderHash(address(perpetual), broker);
         require(!cancelled[orderHash], "cancelled order");
