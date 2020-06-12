@@ -180,8 +180,8 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     function liquidate(address trader, uint256 maxAmount) public returns (uint256, uint256) {
         require(msg.sender != trader, "self liquidate");
         require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
-        require(maxAmount.mod(governance.lotSize) == 0, "invalid lot size");
         require(!isSafe(trader), "safe account");
+        require(isValidLotSize(maxAmount), "invalid lot size");
 
         uint256 liquidationPrice = markPrice();
         require(liquidationPrice > 0, "invalid price");
@@ -215,7 +215,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
-        require(amount.mod(governance.tradingLotSize) == 0, "invalid trading lot size");
+        require(isValidLotSize(amount), "invalid lot size");
 
         takerOpened = MarginAccount.trade(taker, side, price, amount);
         makerOpened = MarginAccount.trade(maker, side.counterSide(), price, amount);

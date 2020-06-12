@@ -37,13 +37,13 @@ contract TestPerpetual is Perpetual {
         return MarginAccount.trade(trader, side, price, amount);
     }
 
-    function addSocialLossPerContract(LibTypes.Side side, int256 amount) internal {
+    function addSocialLossPerContractPublic(LibTypes.Side side, int256 amount) internal {
         require(amount >= 0, "negtive social loss");
         int256 newVal = socialLossPerContracts[uint256(side)].add(amount);
         socialLossPerContracts[uint256(side)] = newVal;
     }
 
     function setSocialLossPerContractPublic(LibTypes.Side side, int256 value) public {
-        addSocialLossPerContract(side, value.sub(socialLossPerContract(side)));
+        addSocialLossPerContractPublic(side, value.sub(socialLossPerContract(side)));
     }
 }

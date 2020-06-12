@@ -23,7 +23,7 @@ const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
 contract('exchange-amm', accounts => {
@@ -63,11 +63,11 @@ contract('exchange-amm', accounts => {
     };
 
     const deploy = async () => {
-        exchange = await Exchange.new();
+        globalConfig = await GlobalConfig.new();
+        exchange = await Exchange.new(globalConfig.address);
         priceFeeder = await PriceFeeder.new();
         share = await ShareToken.new("ST", "STK", 18);
         collateral = await TestToken.new("TT", "TestToken", 18);
-        globalConfig = await GlobalConfig.new();
         perpetual = await Perpetual.new(
             globalConfig.address,
             dev,
@@ -82,11 +82,8 @@ contract('exchange-amm', accounts => {
         await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
         await perpetual.addWhitelisted(proxy.address);
         await perpetual.addWhitelisted(exchange.address);
-    };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
+        await globalConfig.addAuthorizedBroker(admin);
     };
 
     const useDefaultGovParameters = async () => {
@@ -117,44 +114,33 @@ contract('exchange-amm', accounts => {
         await amm.setBlockTimestamp(index.timestamp);
     };
 
-    const setBroker = async (user, broker) => {
-        await perpetual.setBroker(broker, {
-            from: user
-        });
-        await increaseBlockBy(5);
-    };
-
     const copy = (obj) => {
         return JSON.parse(JSON.stringify(obj));
     };
 
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
     const positionEntrySocialLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entrySocialLoss;
     }
     const positionEntryFundingLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryFundingLoss;
     }
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
-    }
-    const appliedBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.appliedBalance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
     const isPositionBalanced = async () => {
         const long = (await perpetual.totalSize(LONG)).toString();
@@ -166,7 +152,6 @@ contract('exchange-amm', accounts => {
 
     beforeEach(async () => {
         await deploy();
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
     });
@@ -199,9 +184,6 @@ contract('exchange-amm', accounts => {
             await amm.createPool(toWad(10), {
                 from: u1
             });
-
-            await setBroker(u1, admin);
-            await setBroker(u2, admin);
             await amm.addWhitelisted(exchange.address);
         });
 
@@ -312,9 +294,6 @@ contract('exchange-amm', accounts => {
             await amm.createPool(toWad(10), {
                 from: u1
             });
-
-            await setBroker(u1, admin);
-            await setBroker(u2, admin);
             await amm.addWhitelisted(exchange.address);
         });
 

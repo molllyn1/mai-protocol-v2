@@ -83,4 +83,14 @@ contract TestMarginAccount is MarginAccount {
     function transferBalancePublic(address from, address to, uint256 amount) public {
         transferBalance(from, to, amount.toInt256());
     }
+
+    function addSocialLossPerContractPublic(LibTypes.Side side, int256 amount) public {
+        require(amount >= 0, "negtive social loss");
+        int256 newVal = socialLossPerContracts[uint256(side)].add(amount);
+        socialLossPerContracts[uint256(side)] = newVal;
+    }
+
+    function setSocialLossPerContractPublic(LibTypes.Side side, int256 value) public {
+        addSocialLossPerContractPublic(side, value.sub(socialLossPerContract(side)));
+    }
 }

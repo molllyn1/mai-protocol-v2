@@ -50,6 +50,7 @@ contract Proxy {
     * @param _implementation Address to delegate.
     */
     function _call(address _implementation) internal authorizedOnly {
+        uint256 _value = msg.value;
         assembly {
         // Copy msg.data. We take full control of memory in this inline assembly
         // block because it will not return to Solidity code. We overwrite the
@@ -59,7 +60,7 @@ contract Proxy {
         // Call the implementation.
         // out and outsize are 0 because we don't know the size yet.
         // let result := delegatecall(gas, _implementation, 0, calldatasize, 0, 0)
-        let result := call(gas, _implementation, 0, 0, calldatasize, 0, 0)
+        let result := call(gas, _implementation, _value, 0, calldatasize, 0, 0)
 
         // Copy the returned data.
         returndatacopy(0, 0, returndatasize)

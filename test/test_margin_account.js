@@ -518,23 +518,19 @@ contract('TestMarginAccount', accounts => {
 
         it('liquidate more - long', async () => {
             await collateral.transfer(u1, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u1
-            });
-            await marginAccount.depositPublic(toWad(700), {
-                from: u1
-            });
+            await collateral.approve(marginAccount.address, infinity, { from: u1 });
+            await marginAccount.depositPublic(toWad(700), { from: u1 });
             assert.equal(fromWad(await cashBalanceOf(u1)), 700);
-
             await marginAccount.tradePublic(u1, LONG, toWad(7000), toWad(1));
 
+            await collateral.transfer(u3, toWad(10000));
+            await collateral.approve(marginAccount.address, infinity, { from: u3 });
+            await marginAccount.depositPublic(toWad(700), { from: u3 });
+            await marginAccount.tradePublic(u3, SHORT, toWad(7000), toWad(1));
+
             await collateral.transfer(u2, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u2
-            });
-            await marginAccount.depositPublic(toWad(700), {
-                from: u2
-            });
+            await collateral.approve(marginAccount.address, infinity, { from: u2 });
+            await marginAccount.depositPublic(toWad(700), { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 700);
 
             let amount = await marginAccount.calculateLiquidateAmount.call(u1, toWad(6000));
@@ -556,28 +552,25 @@ contract('TestMarginAccount', accounts => {
             assert.equal(fromWad(cash2.cashBalance), 700 + 60 * 0.5);
 
             assert.equal(fromWad(await marginAccount.insuranceFundBalance()), 0);
-            assert.equal(fromWad(await marginAccount.socialLossPerContract(LONG)), -(700 - 1000 - 30));
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(LONG)), 0);
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(SHORT)), -(700 - 1000 - 30));
         });
 
         it('liquidate more - short', async () => {
             await collateral.transfer(u1, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u1
-            });
-            await marginAccount.depositPublic(toWad(700), {
-                from: u1
-            });
+            await collateral.approve(marginAccount.address, infinity, { from: u1 });
+            await marginAccount.depositPublic(toWad(700), { from: u1 });
             assert.equal(fromWad(await cashBalanceOf(u1)), 700);
-
             await marginAccount.tradePublic(u1, SHORT, toWad(7000), toWad(1));
 
+            await collateral.transfer(u3, toWad(10000));
+            await collateral.approve(marginAccount.address, infinity, { from: u3 });
+            await marginAccount.depositPublic(toWad(700), { from: u3 });
+            await marginAccount.tradePublic(u3, LONG, toWad(7000), toWad(1));
+
             await collateral.transfer(u2, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u2
-            });
-            await marginAccount.depositPublic(toWad(700), {
-                from: u2
-            });
+            await collateral.approve(marginAccount.address, infinity, { from: u2 });
+            await marginAccount.depositPublic(toWad(700), { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 700);
 
             let amount = await marginAccount.calculateLiquidateAmount.call(u1, toWad(8000));
@@ -599,28 +592,25 @@ contract('TestMarginAccount', accounts => {
             assert.equal(fromWad(cash2.cashBalance), 700 + 80 * 0.5);
 
             assert.equal(fromWad(await marginAccount.insuranceFundBalance()), 0);
-            assert.equal(fromWad(await marginAccount.socialLossPerContract(SHORT)), -(700 - 1000 - 40));
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(SHORT)), 0);
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(LONG)), -(700 - 1000 - 40));
         });
 
         it('liquidate more 2 - long', async () => {
             await collateral.transfer(u1, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u1
-            });
-            await marginAccount.depositPublic(toWad(2000), {
-                from: u1
-            });
+            await collateral.approve(marginAccount.address, infinity, {from: u1 });
+            await marginAccount.depositPublic(toWad(2000), { from: u1 });
             assert.equal(fromWad(await cashBalanceOf(u1)), 2000);
-
             await marginAccount.tradePublic(u1, LONG, toWad(7000), toWad(2));
 
+            await collateral.transfer(u3, toWad(10000));
+            await collateral.approve(marginAccount.address, infinity, { from: u3 });
+            await marginAccount.depositPublic(toWad(700), { from: u3 });
+            await marginAccount.tradePublic(u3, SHORT, toWad(7000), toWad(1));
+
             await collateral.transfer(u2, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u2
-            });
-            await marginAccount.depositPublic(toWad(2000), {
-                from: u2
-            });
+            await collateral.approve(marginAccount.address, infinity, { from: u2 });
+            await marginAccount.depositPublic(toWad(2000), { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 2000);
 
             let amount = await marginAccount.calculateLiquidateAmount.call(u1, toWad(6000));
@@ -642,28 +632,25 @@ contract('TestMarginAccount', accounts => {
             assert.equal(fromWad(cash2.cashBalance), 2000 + 60 * 0.5 * 2);
 
             assert.equal(fromWad(await marginAccount.insuranceFundBalance()), 0);
-            assert.equal(fromWad(await marginAccount.socialLossPerContract(LONG)), -(2000 - 2000 - 60 / 2));
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(LONG)), 0);
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(SHORT)), -(2000 - 2000 - 60 / 1));
         });
 
         it('liquidate more 2 - short', async () => {
             await collateral.transfer(u1, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u1
-            });
-            await marginAccount.depositPublic(toWad(2000), {
-                from: u1
-            });
+            await collateral.approve(marginAccount.address, infinity, { from: u1 });
+            await marginAccount.depositPublic(toWad(2000), { from: u1 });
             assert.equal(fromWad(await cashBalanceOf(u1)), 2000);
-
             await marginAccount.tradePublic(u1, SHORT, toWad(7000), toWad(2));
 
+            await collateral.transfer(u3, toWad(10000));
+            await collateral.approve(marginAccount.address, infinity, { from: u3 });
+            await marginAccount.depositPublic(toWad(700), { from: u3 });
+            await marginAccount.tradePublic(u3, LONG, toWad(7000), toWad(1));
+
             await collateral.transfer(u2, toWad(10000));
-            await collateral.approve(marginAccount.address, infinity, {
-                from: u2
-            });
-            await marginAccount.depositPublic(toWad(2000), {
-                from: u2
-            });
+            await collateral.approve(marginAccount.address, infinity, { from: u2 });
+            await marginAccount.depositPublic(toWad(2000), { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 2000);
 
             let amount = await marginAccount.calculateLiquidateAmount.call(u1, toWad(8000));
@@ -685,7 +672,8 @@ contract('TestMarginAccount', accounts => {
             assert.equal(fromWad(cash2.cashBalance), 2000 + 80 * 0.5 * 2);
 
             assert.equal(fromWad(await marginAccount.insuranceFundBalance()), 0);
-            assert.equal(fromWad(await marginAccount.socialLossPerContract(SHORT)), -(2000 - 2000 - 80 / 2));
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(SHORT)), 0);
+            assert.equal(fromWad(await marginAccount.socialLossPerContract(LONG)), -(2000 - 2000 - 80 / 1));
         });
     });
 
@@ -743,7 +731,6 @@ contract('TestMarginAccount', accounts => {
             assert.equal(fromWad(await marginAccount.availableMarginWithPricePublic.call(u1, toWad(6000))), 10000 - 300);
             assert.equal(fromWad(await marginAccount.marginWithPricePublic(u1, toWad(6000))), 300);
             assert.equal(fromWad(await marginAccount.maintenanceMarginWithPricePublic.call(u1, toWad(6000))), 150);
-            assert.equal(fromWad(await marginAccount.drawableBalanceWithPricePublic.call(u1, toWad(6000))), 0);
             assert.equal(fromWad(await marginAccount.totalSize(LONG)), 0.5);
 
             await marginAccount.tradePublic(u1, LONG, toWad(8000), toWad(0.5));
@@ -757,7 +744,6 @@ contract('TestMarginAccount', accounts => {
             assert.equal(fromWad(await marginAccount.marginWithPricePublic.call(u1, toWad(6000))), 600);
             assert.equal(fromWad(await marginAccount.availableMarginWithPricePublic.call(u1, toWad(6000))), 9000 - 600);
             assert.equal(fromWad(await marginAccount.maintenanceMarginWithPricePublic.call(u1, toWad(6000))), 300);
-            assert.equal(fromWad(await marginAccount.drawableBalanceWithPricePublic.call(u1, toWad(6000))), 0);
             assert.equal(fromWad(await marginAccount.totalSize(LONG)), 1);
 
             await marginAccount.tradePublic(u1, SHORT, toWad(9000), toWad(1.5));
@@ -771,7 +757,6 @@ contract('TestMarginAccount', accounts => {
             assert.equal(fromWad(await marginAccount.marginWithPricePublic.call(u1, toWad(6000))), 300);
             assert.equal(fromWad(await marginAccount.maintenanceMarginWithPricePublic.call(u1, toWad(6000))), 150);
             assert.equal(fromWad(await marginAccount.availableMarginWithPricePublic.call(u1, toWad(6000))), 12000 + 1500 - 300);
-            assert.equal(fromWad(await marginAccount.drawableBalanceWithPricePublic.call(u1, toWad(6000))), 0);
             assert.equal(fromWad(await marginAccount.totalSize(SHORT)), 0.5);
 
         });
@@ -1142,43 +1127,43 @@ contract('TestMarginAccount', accounts => {
         beforeEach(async () => {
             await deploy();
             await collateral.transfer(u1, toWad(10));
-            await collateral.approve(vault.address, infinity, { from: u1 });
-            await vault.depositPublic(toWad(3.1415), { from: u1 });
+            await collateral.approve(marginAccount.address, infinity, { from: u1 });
+            await marginAccount.depositPublic(toWad(3.1415), { from: u1 });
         });
 
         describe("updateBalance", async () => {
 
             it('updateBalance', async () => {
-                await vault.updateBalancePublic(toWad(2), { from: u1 });
+                await marginAccount.updateBalancePublic(toWad(2), { from: u1 });
                 assert.equal(await cashBalanceOf(u1), toWad(5.1415));
                 assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
 
-                await vault.updateBalancePublic(toWad(-2), { from: u1 });
+                await marginAccount.updateBalancePublic(toWad(-2), { from: u1 });
                 assert.equal(await cashBalanceOf(u1), toWad(3.1415));
                 assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
 
-                await vault.updateBalancePublic(toWad(-10), { from: u1 });
+                await marginAccount.updateBalancePublic(toWad(-10), { from: u1 });
                 assert.equal(await cashBalanceOf(u1), toWad(3.1415, -10));
                 assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
             });
 
             it('updateBalance', async () => {
-                await vault.updateBalancePublic(toWad(2), { from: u1 });
-                await vault.ensurePositiveBalancePublic({ from: u1 });
+                await marginAccount.updateBalancePublic(toWad(2), { from: u1 });
+                await marginAccount.ensurePositiveBalancePublic({ from: u1 });
                 assert.equal(await cashBalanceOf(u1), toWad(5.1415));
 
-                await vault.updateBalancePublic(toWad(-2), { from: u1 });
-                let loss = await vault.ensurePositiveBalancePublic.call({ from: u1 });
-                await vault.ensurePositiveBalancePublic({ from: u1 });
+                await marginAccount.updateBalancePublic(toWad(-2), { from: u1 });
+                let loss = await marginAccount.ensurePositiveBalancePublic.call({ from: u1 });
+                await marginAccount.ensurePositiveBalancePublic({ from: u1 });
                 assert.equal(await cashBalanceOf(u1), toWad(3.1415));
                 assert.equal(loss, 0);
 
-                await vault.updateBalancePublic(toWad(-10), { from: u1 });
-                loss = await vault.ensurePositiveBalancePublic.call({ from: u1 });
+                await marginAccount.updateBalancePublic(toWad(-10), { from: u1 });
+                loss = await marginAccount.ensurePositiveBalancePublic.call({ from: u1 });
                 assert.equal(await cashBalanceOf(u1), toWad(3.1415, -10));
                 assert.equal(loss, toWad(10, -3.1415));
 
-                await vault.ensurePositiveBalancePublic({ from: u1 });
+                await marginAccount.ensurePositiveBalancePublic({ from: u1 });
                 assert.equal(await cashBalanceOf(u1), toWad(0));
             });
         });
@@ -1188,24 +1173,24 @@ contract('TestMarginAccount', accounts => {
 
             beforeEach(async () => {
                 await collateral.transfer(u2, toWad(10));
-                await collateral.approve(vault.address, infinity, { from: u2 });
-                await vault.depositPublic(toWad(3.1415), { from: u2 });
+                await collateral.approve(marginAccount.address, infinity, { from: u2 });
+                await marginAccount.depositPublic(toWad(3.1415), { from: u2 });
             });
 
             it('normal', async () => {
-                await vault.transferBalancePublic(u1, u2, toWad(1));
+                await marginAccount.transferBalancePublic(u1, u2, toWad(1));
                 assert.equal(await cashBalanceOf(u1), toWad(3.1415, -1));
                 assert.equal(await cashBalanceOf(u2), toWad(3.1415, 1));
             });
 
             it('too much', async () => {
-                await vault.transferBalancePublic(u1, u2, toWad(99));
+                await marginAccount.transferBalancePublic(u1, u2, toWad(99));
                 assert.equal(await cashBalanceOf(u1), toWad(3.1415, -99));
                 assert.equal(await cashBalanceOf(u2), toWad(3.1415, 99));
             });
 
             it('transfer 0', async () => {
-                await vault.transferBalancePublic(u1, u2, toWad(0));
+                await marginAccount.transferBalancePublic(u1, u2, toWad(0));
                 assert.equal(await cashBalanceOf(u1), toWad(3.1415));
                 assert.equal(await cashBalanceOf(u2), toWad(3.1415));
             });

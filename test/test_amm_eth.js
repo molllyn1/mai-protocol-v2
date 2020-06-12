@@ -9,7 +9,7 @@ const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
 const gasLimit = 8000000;
@@ -67,11 +67,6 @@ contract('amm-eth', accounts => {
         await perpetual.addWhitelisted(proxy.address);
     };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
-    };
-
     const useDefaultGovParameters = async () => {
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
@@ -100,40 +95,31 @@ contract('amm-eth', accounts => {
         await amm.setBlockTimestamp(index.timestamp);
     };
 
-    const setBroker = async (user, broker) => {
-        await perpetual.setBroker(broker, { from: user });
-        for (let i = 0; i < 4; i++) {
-            await increaseEvmBlock();
-        }
-    };
-
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
 
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
 
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
 
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     beforeEach(async () => {
         snapshotId = await createEVMSnapshot();
         await deploy();
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
-        await setBroker(u1, proxy.address);
     });
 
     afterEach(async function () {
@@ -148,13 +134,13 @@ contract('amm-eth', accounts => {
             assert.equal(fromWad(indexPrice.price), 7000);
 
             // create amm
-            await perpetual.depositEther({ value: toWad(7000 * 10 * 2.1), from: u1 });
+            await perpetual.deposit(toWad(7000 * 10 * 2.1), { value: toWad(7000 * 10 * 2.1), from: u1 });
             await amm.createPool(toWad(10), { from: u1 });
         });
 
         it("depositAndBuy - success", async () => {
-            await amm.depositEtherAndBuy(toWad(0), toWad('10000'), infinity, { value: toWad(0), from: u2 });
-            await amm.depositEtherAndBuy(toWad(1), toWad('10000'), infinity, { value: toWad(7000 * 1), from: u2 });
+            // await amm.depositAndBuy(toWad(0), toWad(0), toWad('10000'), infinity, { value: toWad(0), from: u2 });
+            await amm.depositAndBuy(toWad(7000 * 1), toWad(1), toWad('10000'), infinity, { value: toWad(7000 * 1), from: u2 });
 
             assert.equal(fromWad(await amm.positionSize()), 9);
             assert.equal(fromWad(await positionSize(proxy.address)), 9);
@@ -176,20 +162,18 @@ contract('amm-eth', accounts => {
         });
 
         it("depositAndBuy, deposit = $0 - success", async () => {
-            await perpetual.depositEther({ value: toWad(7000 * 1), from: u2 });
+            await perpetual.deposit(toWad(7000 * 1), { value: toWad(7000 * 1), from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000 * 1);
             assert.equal(fromWad(await positionSize(u2)), 0);
-            assert.equal(await perpetual.currentBroker.call(u2), '0x0000000000000000000000000000000000000000');
 
-            await amm.depositEtherAndBuy(toWad(1), toWad('10000'), infinity, { from: u2 });
-            assert.equal(await perpetual.currentBroker.call(u2), proxy.address);
+            await amm.depositAndBuy(toWad(0), toWad(1), toWad('10000'), infinity, { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), '6883.333333333333333333');
             assert.equal(fromWad(await positionSize(u2)), 1);
         });
 
         it("depositAndSell - success", async () => {
-            await amm.depositEtherAndSell(toWad(0), toWad(0), infinity, { value: toWad(0), from: u2 });
-            await amm.depositEtherAndSell(toWad(1), toWad(0), infinity, { value: toWad(2000), from: u2 });
+            await amm.depositAndSell(toWad(0), toWad(0), toWad(0), infinity, { value: toWad(0), from: u2 });
+            await amm.depositAndSell(toWad(2000), toWad(1), toWad(0), infinity, { value: toWad(2000), from: u2 });
 
             assert.equal(fromWad(await amm.positionSize()), 11);
             assert.equal(fromWad(await positionSize(proxy.address)), 11);
@@ -211,8 +195,8 @@ contract('amm-eth', accounts => {
         });
 
         it("depositAndAddLiquidity - success", async () => {
-            await amm.depositEtherAndAddLiquidity(toWad(0), { value: toWad(0), from: u2 });
-            await amm.depositEtherAndAddLiquidity(toWad(1), { value: toWad(7000 * 3), from: u2 });
+            await amm.depositAndAddLiquidity(toWad(0), toWad(0), { value: toWad(0), from: u2 });
+            await amm.depositAndAddLiquidity(toWad(7000 * 3), toWad(1), { value: toWad(7000 * 3), from: u2 });
 
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000);
             assert.equal(fromWad(await share.balanceOf(u2)), 1);
@@ -236,7 +220,7 @@ contract('amm-eth', accounts => {
         });
 
         it('should success', async () => {
-            await perpetual.depositEther({ value: toWad(14700), from: u1 });
+            await perpetual.deposit(toWad(14700), { value: toWad(14700), from: u1 });
             await amm.createPool(toWad(1), { from: u1 });
 
             // await inspect(u1);
@@ -288,7 +272,7 @@ contract('amm-eth', accounts => {
         });
 
         it('duplicated', async () => {
-            await perpetual.depositEther({ value: toWad(14700), from: u1 });
+            await perpetual.deposit(toWad(14700), { value: toWad(14700), from: u1 });
             await amm.createPool(toWad(1), { from: u1 });
             try {
                 await amm.createPool(toWad(1), { from: u1 });
@@ -306,12 +290,8 @@ contract('amm-eth', accounts => {
             const indexPrice = await amm.indexPrice();
             assert.equal(fromWad(indexPrice.price), 7000);
 
-            await setBroker(u2, proxy.address);
-            await setBroker(u3, proxy.address);
-            await increaseBlockBy(4);
-
             // create amm
-            await perpetual.depositEther({ value: toWad(147000), from: u1 });
+            await perpetual.deposit(toWad(147000), { value: toWad(147000), from: u1 });
             await amm.createPool(toWad(10), { from: u1 });
         });
 
@@ -319,7 +299,7 @@ contract('amm-eth', accounts => {
             // buy 1, entryPrice will be 70000 / (10 - 1) = 7777 but markPrice is still 7000
             // pnl = -777, positionMargin = 700
 
-            await perpetual.depositEther({ value: toWad(7000), from: u2 });
+            await perpetual.deposit(toWad(7000), { value: toWad(7000), from: u2 });
             await amm.buy(toWad(1), toWad('10000'), infinity, { from: u2 });
 
             // await inspect(u1);
@@ -351,7 +331,7 @@ contract('amm-eth', accounts => {
 
         it("buy - fail - price limit", async () => {
             // 70000 / (10 - 1) = 7777.7
-            await perpetual.depositEther({ value: toWad(7000), from: u2 });
+            await perpetual.deposit(toWad(7000), { value: toWad(7000), from: u2 });
             try {
                 await amm.buy(toWad(1), toWad(7777), infinity, { from: u2 });
                 throw null;
@@ -365,12 +345,12 @@ contract('amm-eth', accounts => {
             // buy 0.1, entryPrice will be 70000 / (10 - 0.1) = 7070 but markPrice is still 7000
             // deposit = positionMargin + fee - pnl
             // = markPrice * newPos * IMR + tradePrice * newPos * fee - (markPrice - newEntryPrice) * newPos
-            await perpetual.depositEther({ value: toWad('87.67676767676767677'), from: u2 });
+            await perpetual.deposit(toWad('87.67676767676767677'), { value: toWad('87.67676767676767677'), from: u2 });
             await amm.buy(toWad(0.1), toWad('10000'), infinity, { from: u2 });
         });
 
         it("buy - fail - pnl < 0, lower than critical deposit amount", async () => {
-            await perpetual.depositEther({ value: toWad('87.67676767676767676'), from: u2 });
+            await perpetual.deposit(toWad('87.67676767676767676'), { value: toWad('87.67676767676767676'), from: u2 });
             try {
                 await amm.buy(toWad(0.1), toWad('10000'), infinity, { from: u2 });
                 throw null;
@@ -380,7 +360,7 @@ contract('amm-eth', accounts => {
         });
 
         it("buy - fail - deadline", async () => {
-            await perpetual.depositEther({ value: toWad(7000), from: u2 });
+            await perpetual.deposit(toWad(7000), { value: toWad(7000), from: u2 });
 
             const t1 = (await amm.mockBlockTimestamp()).toNumber();
             await amm.setBlockTimestamp(t1 + 600);
@@ -393,7 +373,7 @@ contract('amm-eth', accounts => {
         });
 
         it("sell - fail - price unsafe", async () => {
-            await perpetual.depositEther({ value: toWad(700), from: u2 });
+            await perpetual.deposit(toWad(700), { value: toWad(700), from: u2 });
             try {
                 await amm.sell(toWad(1), toWad(0), infinity, { from: u2 });
                 throw null;
@@ -403,7 +383,7 @@ contract('amm-eth', accounts => {
         });
 
         it("sell - fail - price limit", async () => {
-            await perpetual.depositEther({ value: toWad(7000), from: u2 });
+            await perpetual.deposit(toWad(7000), { value: toWad(7000), from: u2 });
             try {
                 await amm.sell(toWad(1), toWad(6364), infinity, { from: u2 });
                 throw null;
@@ -416,7 +396,7 @@ contract('amm-eth', accounts => {
         it("sell - success", async () => {
             // sell 1, entryPrice will be 70000 / (10 + 1) = 6363 but markPrice is still 7000.
             // pnl = -636, positionMargin = 636
-            await perpetual.depositEther({ value: toWad(2000), from: u2 });
+            await perpetual.deposit(toWad(2000), { value: toWad(2000), from: u2 });
             await amm.sell(toWad(1), toWad(0), infinity, { from: u2 });
 
             assert.equal(fromWad(await amm.positionSize()), 11);
@@ -439,7 +419,7 @@ contract('amm-eth', accounts => {
         });
 
         it("buy and sell - success", async () => {
-            await perpetual.depositEther({ value: toWad(7000), from: u2 });
+            await perpetual.deposit(toWad(7000), { value: toWad(7000), from: u2 });
             await amm.buy(toWad(1), toWad('8100'), infinity, { from: u2 });
             assert.equal(fromWad(await amm.positionSize()), 9);
             assert.equal(fromWad(await positionSize(proxy.address)), 9);
@@ -475,7 +455,7 @@ contract('amm-eth', accounts => {
         });
 
         it("sell - fail - deadline", async () => {
-            await perpetual.depositEther({ value: toWad(1100), from: u2 });
+            await perpetual.deposit(toWad(1100),{ value: toWad(1100), from: u2 });
             const t1 = (await amm.mockBlockTimestamp()).toNumber();
             await amm.setBlockTimestamp(t1 + 600);
             try {
@@ -497,7 +477,7 @@ contract('amm-eth', accounts => {
 
         it('addLiquidity - fail - unsafe', async () => {
             try {
-                await perpetual.depositEther({ value: toWad(14000), from: u2 });
+                await perpetual.deposit(toWad(14000), { value: toWad(14000), from: u2 });
                 await amm.addLiquidity(toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
@@ -506,7 +486,7 @@ contract('amm-eth', accounts => {
         });
 
         it("addLiquidity - success", async () => {
-            await perpetual.depositEther({ value: toWad(21000), from: u2 });
+            await perpetual.deposit(toWad(21000), { value: toWad(21000), from: u2 });
             await amm.addLiquidity(toWad(1), { from: u2 });
 
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000);
@@ -531,7 +511,7 @@ contract('amm-eth', accounts => {
         });
 
         it("removeLiquidity - success", async () => {
-            await perpetual.depositEther({ value: toWad(21000), from: u2 });
+            await perpetual.deposit(toWad(21000), { value: toWad(21000), from: u2 });
             await amm.addLiquidity(toWad(1), { from: u2 });
             await share.approve(amm.address, infinity, { from: u2 });
 
@@ -549,7 +529,7 @@ contract('amm-eth', accounts => {
         });
 
         it("removeLiquidity - no position on removing liqudity", async () => {
-            await perpetual.depositEther({ value: toWad(21000), from: u2 });
+            await perpetual.deposit(toWad(21000), { value: toWad(21000), from: u2 });
             await amm.addLiquidity(toWad(1), { from: u2 });
 
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000);
@@ -578,10 +558,10 @@ contract('amm-eth', accounts => {
         });
 
         it("removeLiquidity - transfer share", async () => {
-            await perpetual.depositEther({ value: toWad(21000), from: u2 });
+            await perpetual.deposit(toWad(21000), { value: toWad(21000), from: u2 });
             await amm.addLiquidity(toWad(1), { from: u2 });
 
-            await perpetual.depositEther({ value: toWad(21000), from: u3 });
+            await perpetual.deposit(toWad(21000), { value: toWad(21000), from: u3 });
 
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000);
             assert.equal(fromWad(await share.balanceOf(u2)), 1);
@@ -611,7 +591,7 @@ contract('amm-eth', accounts => {
         });
 
         it("updateIndex", async () => {
-            await perpetual.depositEther({ value: toWad(7000), from: dev });
+            await perpetual.deposit(toWad(7000), { value: toWad(7000), from: dev });
 
             //index price not change
             await amm.updateIndex({ from: u2 });
@@ -629,25 +609,16 @@ contract('amm-eth', accounts => {
 
         beforeEach(async () => {
             await setIndexPrice(1 / 160);
-
-            await setBroker(u2, proxy.address);
-            await setBroker(u3, proxy.address);
-            await increaseBlockBy(4);
-
             // create amm
             u1Balance = new BigNumber(await web3.eth.getBalance(u1));
-            await perpetual.depositEther({ value: toWad(50), from: u1 });
+            await perpetual.deposit(toWad(50), { value: toWad(50), from: u1 });
             await amm.createPool(toWad(3360), { from: u1 });
             let u1Balance2 = new BigNumber(await web3.eth.getBalance(u1));
             assertApproximate(assert, fromWad(u1Balance.minus(u1Balance2)), 50, 0.5);
         });
 
         it("settle", async () => {
-            // await inspect(u1, perpetual, proxy, amm);
-            // await printFunding(amm, perpetual);
             await perpetual.beginGlobalSettlement(toWad(1 / 160));
-
-            // await inspect(u1, perpetual, proxy, amm);
             assert.equal(fromWad(await share.balanceOf(u1)), 3360);
             try {
                 await amm.removeLiquidity(toWad(3360), { from: u1 });
@@ -676,17 +647,8 @@ contract('amm-eth', accounts => {
         it("sellAndWithdraw0408", async () => {
             await setIndexPrice('0.005799583022688399');
             await perpetual.forceSetTotalSize(toWad(9280));
-            await perpetual.forceSetCollateral(u2, {
-                balance: toWad('0.964076134677459824'),
-                appliedBalance: 0,
-                appliedHeight: 0,
-            });
-            await perpetual.forceSetCollateral(proxy.address, {
-                balance: toWad('97.885161577581446197'),
-                appliedBalance: 0,
-                appliedHeight: 0,
-            });
             await perpetual.forceSetPosition(u2, {
+                cashBalance: toWad('0.964076134677459824'),
                 side: Side.LONG,
                 size: toWad('50'),
                 entryValue: toWad('0.2891254315304948'),
@@ -694,6 +656,7 @@ contract('amm-eth', accounts => {
                 entryFundingLoss: toWad('0.0032030281077095'),
             });
             await perpetual.forceSetPosition(proxy.address, {
+                cashBalance: toWad('97.885161577581446197'),
                 side: Side.LONG,
                 size: toWad('7940'),
                 entryValue: toWad('51.680889367347830167'),
@@ -707,12 +670,7 @@ contract('amm-eth', accounts => {
                 lastIndexPrice: toWad('0.005799583022688399'),
                 accumulatedFundingPerContract: toWad('0.00006802615424114'),
             })
-            await perpetual.depositEther({ value: toWad(3000), from: admin }); // force save
-
-            // await inspect(u2)
-            // await inspect(proxy.address);
-            // await printFunding();
-            await setBroker(u2, proxy.address);
+            await perpetual.deposit(toWad(3000), { value: toWad(3000), from: admin }); // force save
 
             // this should be success
             // await amm.sell(toWad(10), toWad(0), infinity, { from: u2 });

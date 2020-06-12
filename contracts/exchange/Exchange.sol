@@ -48,6 +48,7 @@ contract Exchange {
         IPerpetual perpetual = IPerpetual(_perpetual);
         require(perpetual.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
 
+        uint256 tradingLotSize = perpetual.getGovernance().tradingLotSize;
         bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
         uint256 takerFilledAmount = filled[takerOrderHash];
         uint256 takerOpened;
@@ -69,6 +70,7 @@ contract Exchange {
 
             require(amounts[i] <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
             require(amounts[i] <= makerOrderParams[i].amount.sub(makerFilledAmount), "maker overfilled");
+            require(amounts[i].mod(tradingLotSize) == 0, "invalid trading lot size");
 
             uint256 opened = fillOrder(perpetual, takerOrderParam, makerOrderParams[i], amounts[i]);
 

@@ -84,4 +84,8 @@ interface IPerpetual {
     function isWhitelistAdmin(address guy) external view returns (bool);
 
     function beginGlobalSettlement(uint256 price) external;
+
+    function isValidLotSize(uint256 amount) external view returns (bool);
+
+    function isValidTradingLotSize(uint256 amount) external view returns (bool);
 }

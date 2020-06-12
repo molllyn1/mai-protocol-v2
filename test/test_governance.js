@@ -41,11 +41,6 @@ contract('TestPerpGovernance', accounts => {
         await usePoolDefaultParameters();
     };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
-    };
-
     const useDefaultGovParameters = async () => {
         await governance.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await governance.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
@@ -170,30 +165,6 @@ contract('TestPerpGovernance', accounts => {
 
             try {
                 await governance.setGovernanceAddress(toBytes32("notexists"), "0x0000000000000000000000000000000000000001");
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("key not exists"), error);
-            }
-        });
-    });
-
-
-    describe("global config", async () => {
-        before(deploy);
-
-        it('set governance value', async () => {
-            assert.equal(await globalConfig.withdrawalLockBlockCount(), 5);
-            await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 4);
-            assert.equal(await globalConfig.withdrawalLockBlockCount(), 4);
-
-            assert.equal(await globalConfig.brokerLockBlockCount(), 5);
-            await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 2);
-            assert.equal(await globalConfig.brokerLockBlockCount(), 2);
-        });
-
-        it('key not exists', async () => {
-            try {
-                await globalConfig.setGlobalParameter(toBytes32("llllrate"), toWad(0.5));
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("key not exists"), error);

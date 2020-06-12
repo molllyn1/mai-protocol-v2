@@ -100,4 +100,12 @@ contract PerpetualGovernance is PerpetualStorage {
         status = LibTypes.Status.SETTLED;
         emit EnterSettledStatus();
     }
+
+    function isValidLotSize(uint256 amount) internal view returns (bool) {
+        return amount > 0 && amount.mod(governance.lotSize) == 0;
+    }
+
+    function isValidTradingLotSize(uint256 amount) internal view returns (bool) {
+        return amount > 0 && amount.mod(governance.tradingLotSize) == 0;
+    }
 }

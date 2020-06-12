@@ -62,7 +62,7 @@ contract('exchange-user', accounts => {
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
         global = await GlobalConfig.new();
         funding = await TestFundingMock.new();
-        exchange = await Exchange.new();
+        exchange = await Exchange.new(global.address);
         perpetual = await Perpetual.new(
             global.address,
             dev,
@@ -73,20 +73,8 @@ contract('exchange-user', accounts => {
 
         await perpetual.addWhitelisted(exchange.address);
         await perpetual.addWhitelisted(admin);
-        await perpetual.setBroker(admin, {
-            from: u1
-        });
-        await perpetual.setBroker(admin, {
-            from: u2
-        });
-        await perpetual.setBroker(admin, {
-            from: u3
-        });
-        await perpetual.setBroker(admin, {
-            from: u4
-        });
 
-        await increaseBlockBy(4);
+        await global.addAuthorizedBroker(admin);
     };
 
     const setDefaultGovParameters = async () => {
@@ -114,9 +102,6 @@ contract('exchange-user', accounts => {
             from: account
         });
         assert.equal(fromWad(await cashBalanceOf(account)), amount);
-        await perpetual.setBroker(admin, {
-            from: account
-        });
     };
 
     const positionSize = async (user) => {
@@ -486,9 +471,6 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -498,9 +480,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u2
-            });
 
             await funding.setMarkPrice(toWad(6000));
 
@@ -549,9 +528,6 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -561,9 +537,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u2
-            });
 
             await funding.setMarkPrice(toWad(6000));
 
@@ -915,13 +888,11 @@ contract('exchange-user', accounts => {
     });
 
     it("trade", async () => {
-        console.log("+++++++++++++", await exchange.getChainId());
 
         await collateral.transfer(u1, toWad(10000));
         await collateral.approve(perpetual.address, infinity, { from: u1 });
         await perpetual.deposit(toWad(10000), { from: u1 });
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-        await perpetual.setBroker(admin, {from: u1});
 
         await perpetual.oneSideTradePublic(u1, LONG, toWad(6000), toWad(1));
         assert.ok(await perpetual.isSafe.call(u1));
@@ -1168,9 +1139,6 @@ contract('exchange-user', accounts => {
             from: u1
         });
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-        await perpetual.setBroker(admin, {
-            from: u1
-        });
 
         await collateral.transfer(u2, toWad(10000));
         await collateral.approve(perpetual.address, infinity, {
@@ -1180,9 +1148,7 @@ contract('exchange-user', accounts => {
             from: u2
         });
         assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-        await perpetual.setBroker(admin, {
-            from: u2
-        });
+
 
         await funding.setMarkPrice(toWad(6000));
 
@@ -1223,8 +1189,6 @@ contract('exchange-user', accounts => {
             ]
         );
 
-        console.log(tx);
-
         assert.equal(fromWad(await cashBalanceOf(u1)), 9880);
         assert.equal(fromWad(await positionEntryValue(u1)), 6000);
         assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 300);
@@ -1248,9 +1212,6 @@ contract('exchange-user', accounts => {
             from: u1
         });
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-        await perpetual.setBroker(admin, {
-            from: u1
-        });
 
         await collateral.transfer(u2, toWad(10000));
         await collateral.approve(perpetual.address, infinity, {
@@ -1260,9 +1221,6 @@ contract('exchange-user', accounts => {
             from: u2
         });
         assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-        await perpetual.setBroker(admin, {
-            from: u2
-        });
 
         await funding.setMarkPrice(toWad(6000));
 
@@ -1302,9 +1260,6 @@ contract('exchange-user', accounts => {
                 toWad(0)
             ]
         );
-
-        console.log(tx);
-
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
         assert.equal(fromWad(await positionEntryValue(u1)), 0);
         assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 0);
@@ -1579,7 +1534,7 @@ contract('exchange-user', accounts => {
             );
             throw null;
         } catch (error) {
-            assert.ok(error.message.includes("invalid broker"), error);
+            assert.ok(error.message.includes("unauthorized broker"));
         }
     });
 
@@ -1631,7 +1586,7 @@ contract('exchange-user', accounts => {
             );
             throw null;
         } catch (error) {
-            assert.ok(error.message.includes("invalid broker"), error);
+            assert.ok(error.message.includes("unauthorized broker"));
         }
     });
 
@@ -1694,28 +1649,14 @@ contract('exchange-user', accounts => {
 
         it("validate", async () => {
             await collateral.transfer(u1, toWad(10000));
-            await collateral.approve(perpetual.address, infinity, {
-                from: u1
-            });
-            await perpetual.deposit(toWad(10000), {
-                from: u1
-            });
+            await collateral.approve(perpetual.address, infinity, { from: u1 });
+            await perpetual.deposit(toWad(10000), { from: u1 });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
-            await collateral.approve(perpetual.address, infinity, {
-                from: u2
-            });
-            await perpetual.deposit(toWad(10000), {
-                from: u2
-            });
+            await collateral.approve(perpetual.address, infinity, { from: u2 });
+            await perpetual.deposit(toWad(10000), { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u2
-            });
 
             await funding.setMarkPrice(toWad(6000));
             const takerParam = {
@@ -1781,9 +1722,7 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u1
-            });
+
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -1793,9 +1732,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u2
-            });
 
             await funding.setMarkPrice(toWad(6000));
 
@@ -1866,9 +1802,6 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -1878,9 +1811,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u2
-            });
 
             await funding.setMarkPrice(toWad(6000));
 
@@ -1944,9 +1874,6 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(u3, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -1956,9 +1883,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(u3, {
-                from: u2
-            });
 
             await increaseBlockBy(5);
 
@@ -1990,13 +1914,13 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, u3);
 
+            await global.addAuthorizedBroker(u3);
             await exchange.matchOrders(
                 takerParam,
                 [makerParam],
                 perpetual.address,
-                [toWad(1)], {
-                from: u3
-            }
+                [toWad(1)],
+                { from: u3 }
             );
 
             // taker dev0.01 + trade0.01 = 120
@@ -2024,9 +1948,6 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(u3, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -2036,9 +1957,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(u3, {
-                from: u2
-            });
 
             await increaseBlockBy(5);
 
@@ -2070,6 +1988,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, u3);
 
+            await global.addAuthorizedBroker(u3);
             try {
                 await exchange.matchOrders(
                     takerParam,
@@ -2097,9 +2016,6 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(u3, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -2109,9 +2025,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(u3, {
-                from: u2
-            });
 
             await increaseBlockBy(5);
 
@@ -2143,6 +2056,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, u3);
 
+            await global.addAuthorizedBroker(u3);
             try {
                 await exchange.matchOrders(
                     takerParam,
@@ -2167,9 +2081,6 @@ contract('exchange-user', accounts => {
                 from: u1
             });
             assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u1
-            });
 
             await collateral.transfer(u2, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -2179,9 +2090,6 @@ contract('exchange-user', accounts => {
                 from: u2
             });
             assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-            await perpetual.setBroker(admin, {
-                from: u2
-            });
 
             await funding.setMarkPrice(toWad(6000));
             const takerParam = {
@@ -2242,6 +2150,7 @@ contract('exchange-user', accounts => {
                 assert.ok(error.message.includes("order expired"), error);
             }
 
+            await global.addAuthorizedBroker(u3);
             try {
                 let tp = copy(takerParam);
                 let mp = copy(makerParam);
@@ -2256,7 +2165,7 @@ contract('exchange-user', accounts => {
                 );
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid broker"), error);
+                assert.ok(error.message.includes("invalid signature"));
             }
 
             try {
@@ -2271,7 +2180,7 @@ contract('exchange-user', accounts => {
                 );
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid signature"), error);
+                assert.ok(error.message.includes("invalid signature"));
             }
 
             try {

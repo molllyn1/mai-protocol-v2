@@ -43,8 +43,6 @@ contract('TestExtension', accounts => {
     };
 
     const setDefaultGovParameters = async () => {
-        await global.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await global.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
         await perpetual.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.005));
@@ -68,8 +66,8 @@ contract('TestExtension', accounts => {
     };
 
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     describe("trade", async () => {
@@ -86,18 +84,14 @@ contract('TestExtension', accounts => {
 
             await perpetual.addWhitelisted(admin);
             await perpetual.depositFor(u1, toWad(1000));
-            await perpetual.setBrokerFor(u1, admin);
 
-            await increaseBlockBy(5);
-
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
 
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
             assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 1000);
             assert.equal(fromWad(await perpetual.pnl.call(u1)), 0);
             assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 300);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), 0);
             assert.equal(await perpetual.isSafe.call(u1), true);
             assert.equal(await perpetual.isBankrupt.call(u1), false);
 
@@ -110,7 +104,6 @@ contract('TestExtension', accounts => {
             assert.equal(fromWad(await perpetual.marginBalance.call(u1)), -1e-18);
             assert.equal(fromWad(await perpetual.pnl.call(u1)), -1000 - 1e-18);
             assert.equal(fromWad(await perpetual.availableMargin.call(u1)), -600 - 1e-18);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), -600 - 1e-18);
             assert.equal(await perpetual.isSafe.call(u1), false);
             assert.equal(await perpetual.isBankrupt.call(u1), true);
         });
@@ -121,22 +114,20 @@ contract('TestExtension', accounts => {
 
             await perpetual.addWhitelisted(admin);
             await perpetual.depositFor(u1, toWad(1000));
-            await perpetual.setBrokerFor(u1, admin);
-
-            await increaseBlockBy(5);
 
             let funding7k = await TestFundingMock.new();
             await funding7k.setMarkPrice(toWad(7000));
             await perpetual.setGovernanceAddress(toBytes32("amm"), funding7k.address);
 
-            await perpetual.tradePosition(u1, SHORT, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, SHORT, toWad(7000), toWad(1));
+
+            console.log(await perpetual.getMarginAccount(u1));
 
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
             assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 1000);
             assert.equal(fromWad(await perpetual.pnl.call(u1)), 0);
             assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 300);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), 0);
             assert.equal(await perpetual.isSafe.call(u1), true);
             assert.equal(await perpetual.isBankrupt.call(u1), false);
 
@@ -149,7 +140,6 @@ contract('TestExtension', accounts => {
             assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 2000);
             assert.equal(fromWad(await perpetual.pnl.call(u1)), 1000);
             assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 1400);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), 0);
             assert.equal(await perpetual.isSafe.call(u1), true);
             assert.equal(await perpetual.isBankrupt.call(u1), false);
         });

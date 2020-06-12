@@ -9,7 +9,7 @@ const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 
@@ -57,7 +57,7 @@ contract('exchange-user-reverse', accounts => {
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
         global = await GlobalConfig.new();
         funding = await TestFundingMock.new();
-        exchange = await Exchange.new();
+        exchange = await Exchange.new(global.address);
         perpetual = await Perpetual.new(
             global.address,
             dev,
@@ -74,12 +74,8 @@ contract('exchange-user-reverse', accounts => {
 
         await perpetual.addWhitelisted(exchange.address);
         await perpetual.addWhitelisted(admin);
-        await perpetual.setBroker(admin, { from: u1 });
-        await perpetual.setBroker(admin, { from: u2 });
-        await perpetual.setBroker(admin, { from: u3 });
-        await perpetual.setBroker(admin, { from: u4 });
 
-        await increaseBlockBy(4);
+        await global.addAuthorizedBroker(admin);
     };
 
     const setDefaultGovParameters = async () => {
@@ -101,23 +97,23 @@ contract('exchange-user-reverse', accounts => {
     };
 
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
 
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
 
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
 
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     beforeEach(async () => {
@@ -138,13 +134,11 @@ contract('exchange-user-reverse', accounts => {
         await collateral.approve(perpetual.address, infinity, { from: u1 });
         await perpetual.deposit(toWad(10000), { from: u1 });
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-        await perpetual.setBroker(admin, { from: u1 });
 
         await collateral.transfer(u2, toWad(10000));
         await collateral.approve(perpetual.address, infinity, { from: u2 });
         await perpetual.deposit(toWad(10000), { from: u2 });
         assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-        await perpetual.setBroker(admin, { from: u2 });
 
         await funding.setMarkPrice(toWad(6000));
         const takerParam = {
@@ -193,13 +187,11 @@ contract('exchange-user-reverse', accounts => {
         await collateral.approve(perpetual.address, infinity, { from: u1 });
         await perpetual.deposit(toWad(10000), { from: u1 });
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-        await perpetual.setBroker(admin, { from: u1 });
 
         await collateral.transfer(u2, toWad(10000));
         await collateral.approve(perpetual.address, infinity, { from: u2 });
         await perpetual.deposit(toWad(10000), { from: u2 });
         assert.equal(fromWad(await cashBalanceOf(u2)), 10000);
-        await perpetual.setBroker(admin, { from: u2 });
 
         await funding.setMarkPrice(toWad(0.005));
 
@@ -272,30 +264,23 @@ contract('exchange-user-reverse', accounts => {
 
             await setIndexPrice('0.005853985933606647');
             await perpetual.forceSetTotalSize(toWad(9710));
-            await perpetual.forceSetCollateral(u2, {
-                balance: toWad('0.203502974381583502'),
-                appliedBalance: 0,
-                appliedHeight: 0,
-            });
-            await perpetual.forceSetCollateral(u3, {
-                balance: toWad('9999.985367565750491063'),
-                appliedBalance: 0,
-                appliedHeight: 0,
-            });
             await perpetual.forceSetPosition(u2, {
-                side: Side.SHORT,
+                cashBalance: toWad('0.203502974381583502'),
+                side: SHORT,
                 size: toWad('10'),
                 entryValue: toWad('0.05847953216374269'),
                 entrySocialLoss: toWad('0'),
                 entryFundingLoss: toWad('0.00016654645771424'),
             });
             await perpetual.forceSetPosition(u3, {
-                side: Side.LONG,
+                cashBalance: toWad('9999.985367565750491063'),
+                side: LONG,
                 size: toWad('1990'),
                 entryValue: toWad('11.563512253351256565'),
                 entrySocialLoss: toWad('0'),
                 entryFundingLoss: toWad('0.03419134483667053'),
             });
+
             await amm.forceSetFunding({
                 lastFundingTime: Math.floor(Date.now() / 1000) - 60,
                 lastPremium: toWad('0.000008166798236978'),
@@ -344,11 +329,18 @@ contract('exchange-user-reverse', accounts => {
                 salt: 3,
                 inversed: true,
             };
+
             await exchange.matchOrders(
                 await buildOrder(takerParam, perpetual.address, admin),
-                [await buildOrder(makerParam1, perpetual.address, admin), await buildOrder(makerParam2, perpetual.address, admin)],
+                [
+                    await buildOrder(makerParam1, perpetual.address, admin),
+                    await buildOrder(makerParam2, perpetual.address, admin)
+                ],
                 perpetual.address,
-                [toWad(200), toWad(120)]
+                [
+                    toWad(200),
+                    toWad(120)
+                ]
             );
         });
     });

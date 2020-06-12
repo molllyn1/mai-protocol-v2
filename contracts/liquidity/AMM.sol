@@ -179,6 +179,7 @@ contract AMM is AMMGovernance {
 
     function buyFrom(address trader, uint256 amount, uint256 limitPrice, uint256 deadline) private returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
+        require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
 
         uint256 price = getBuyPrice(amount);
         require(limitPrice >= price, "price limited");
@@ -226,6 +227,7 @@ contract AMM is AMMGovernance {
 
     function sellFrom(address trader, uint256 amount, uint256 limitPrice, uint256 deadline) private returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
+        require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
 
         uint256 price = getSellPrice(amount);
         require(limitPrice <= price, "price limited");
@@ -302,8 +304,8 @@ contract AMM is AMMGovernance {
         uint256 price = oldAvailableMargin.wdiv(oldPoolPositionSize);
         uint256 amount = shareAmount.wmul(oldPoolPositionSize).wdiv(shareToken.totalSupply());
         // align to lotSize
-        uint256 lotSize = perpetualProxy.getGovernance().lotSize;
-        amount = amount.sub(amount.mod(lotSize));
+        uint256 tradingLotSize = perpetualProxy.getGovernance().tradingLotSize;
+        amount = amount.sub(amount.mod(tradingLotSize));
 
         perpetualProxy.transferCashBalance(tradingAccount(), trader, price.wmul(amount).mul(2));
         burnShareTokenFrom(trader, shareAmount);

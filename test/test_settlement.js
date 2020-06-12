@@ -21,7 +21,7 @@ const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
 const gasLimit = 8000000;
@@ -78,10 +78,6 @@ contract('statement', accounts => {
         await perpetual.addWhitelisted(proxy.address);
     };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
-    };
 
     const useDefaultGovParameters = async () => {
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
@@ -111,15 +107,6 @@ contract('statement', accounts => {
         await amm.setBlockTimestamp(index.timestamp);
     };
 
-    const setBroker = async (user, broker) => {
-        await perpetual.setBroker(broker, {
-            from: user
-        });
-        for (let i = 0; i < 4; i++) {
-            await increaseEvmBlock();
-        }
-    };
-
     const positionSize = async (user) => {
         const positionAccount = await perpetual.getPosition(user);
         return positionAccount.size;
@@ -140,16 +127,14 @@ contract('statement', accounts => {
         return positionAccount.entryFundingLoss;
     }
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     beforeEach(async () => {
         await deploy();
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
-        await setBroker(u1, proxy.address);
     });
 
     beforeEach(async () => {
@@ -175,9 +160,6 @@ contract('statement', accounts => {
         await collateral.approve(perpetual.address, infinity, {
             from: dev
         });
-        await setBroker(u2, proxy.address);
-        await setBroker(u3, proxy.address);
-        await increaseBlockBy(4);
 
         // create amm
         await perpetual.deposit(toWad(7000 * 10 * 2.1), {
@@ -267,7 +249,7 @@ contract('statement', accounts => {
         const total = (await perpetual.marginBalance.call(u2)).toString();
         assert.equal(total, "6105555555555555555554");
 
-        const cash = fromWad((await perpetual.getCashBalance(u2)).balance);
+        const cash = fromWad((await perpetual.getMarginAccount(u2)).cashBalance);
 
         await perpetual.beginGlobalSettlement(toWad(7000));
         try {
@@ -293,7 +275,7 @@ contract('statement', accounts => {
         const pnl = (await perpetual.pnl.call(u2)).toString();
         // assert.equal(pnl, "-777777777777777777779");
 
-        const cash = fromWad((await perpetual.getCashBalance(u2)).balance);
+        const cash = fromWad((await perpetual.getMarginAccount(u2)).cashBalance);
 
         await perpetual.beginGlobalSettlement(toWad(7000));
         await perpetual.setCashBalance(u2, "777777777777777777779");
@@ -386,9 +368,7 @@ contract('statement', accounts => {
 
         await setIndexPrice(5000);
         const allows = [
-            perpetual.deposit(toWad(1), {from: u2}),
-            // perpetual.depositEther({value: toWad(1), from: u2}),
-            perpetual.applyForWithdrawal(toWad(1), {from:u2}),
+            perpetual.deposit(toWad(1), {from: u2})
         ]
         for (let i = 0; i < allows.length; i++) {
             await allows[i];

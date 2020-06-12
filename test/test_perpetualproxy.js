@@ -22,7 +22,7 @@ const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
 const gasLimit = 8000000;
@@ -81,10 +81,6 @@ contract('amm', accounts => {
         await perpetual.addWhitelisted(proxy.address);
     };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
-    };
 
     const useDefaultGovParameters = async () => {
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
@@ -124,35 +120,33 @@ contract('amm', accounts => {
     };
 
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
 
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
 
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
 
     const positionEntryFundingLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryFundingLoss;
     }
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     beforeEach(async () => {
         await deploy();
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
-        await setBroker(u1, proxy.address);
 
         await setIndexPrice(7000);
         const indexPrice = await amm.indexPrice();
@@ -175,8 +169,6 @@ contract('amm', accounts => {
         await collateral.approve(perpetual.address, infinity, {
             from: dev
         });
-        await setBroker(u2, proxy.address);
-        await setBroker(u3, proxy.address);
         await increaseBlockBy(4);
 
         // create amm
@@ -222,82 +214,59 @@ contract('amm', accounts => {
         assert.equal(fromWad(await positionEntryValue(proxy.address)), '63000');
         assert.equal(fromWad(await amm.currentFairPrice.call()), '8650.617283950617283951');
 
+        await perpetual.setGovernanceAddress(toBytes32("amm"), admin);
+        const implementation = proxy.address;
+        proxy = await Perpetual.at(implementation);
+
         assert.equal(await proxy.settlementPrice(), 0);
-        assert.equal(fromWad(await proxy.availableMargin.call(proxy.address)), fromWad(await perpetual.availableMargin.call(proxy.address)));
-        assert.equal(fromWad(await proxy.cashBalance()), '140855.555555555555555555');
-        assert.equal(await proxy.positionSide(), Side.LONG);
-        assert.equal(fromWad(await proxy.positionEntryValue()), '63000');
-        assert.equal(fromWad(await proxy.positionEntrySocialLoss()), '0');
-        assert.equal(fromWad(await proxy.positionEntryFundingLoss()), '0');
+        const marginAccount = await proxy.getMarginAccount(implementation);
+        assert.equal(fromWad(marginAccount.cashBalance), '140855.555555555555555555');
+        assert.equal(marginAccount.side, Side.LONG);
+        assert.equal(fromWad(marginAccount.entryValue), '63000');
+        assert.equal(fromWad(marginAccount.entrySocialLoss), '0');
+        assert.equal(fromWad(marginAccount.entryFundingLoss), '0');
         assert.equal(fromWad(await proxy.socialLossPerContract(Side.LONG)), '0');
         assert.equal(fromWad(await proxy.socialLossPerContract(Side.SHORT)), '0');
-        assert.equal(await proxy.isProxySafe.call(), true);
-        assert.equal(await proxy.isIMSafe.call(proxy.address), true);
     });
 
 
      it("privileges", async () => {
-         try {
-            await proxy.transferBalanceIn("0x1111111111111111111111111111111111111111", toWad(1));
-            throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
+
+        proxy = await Perpetual.at(proxy.address);
 
         try {
-            await proxy.transferBalanceIn("0x1111111111111111111111111111111111111111", toWad(1));
+            await proxy.transferCashBalance("0x1111111111111111111111111111111111111111", "0x1111111111111111111111111111111111111111", toWad(1));
             throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
+        } catch (error) {
+            assert.ok(error.message.includes("unauthorized caller"), error);
+        }
 
         try {
-            await proxy.transferBalanceOut("0x1111111111111111111111111111111111111111", toWad(1));
+            await proxy.tradePosition("0x1111111111111111111111111111111111111111", "0x1111111111111111111111111111111111111111", 1, toWad(6000), toWad(1));
             throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
-
-        try {
-            await proxy.transferBalanceTo("0x1111111111111111111111111111111111111111", "0x1111111111111111111111111111111111111111", toWad(1));
-            throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
-
-        try {
-            await proxy.trade("0x1111111111111111111111111111111111111111", 1, toWad(6000), toWad(1));
-            throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
-
-        try {
-            await proxy.setBrokerFor("0x1111111111111111111111111111111111111111", "0x1111111111111111111111111111111111111112");
-            throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
+        } catch (error) {
+            assert.ok(error.message.includes("unauthorized caller"));
+        }
 
         try {
             await proxy.depositFor("0x1111111111111111111111111111111111111111", toWad(1));
             throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
+        } catch (error) {
+            assert.ok(error.message.includes("unauthorized caller"));
+        }
 
         try {
-            await proxy.depositEtherFor("0x1111111111111111111111111111111111111111", { value: toWad(1)});
+            await proxy.depositFor("0x1111111111111111111111111111111111111111", toWad(1), { value: toWad(1)});
             throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
+        } catch (error) {
+            assert.ok(error.message.includes("unauthorized caller"));
+        }
 
         try {
             await proxy.withdrawFor("0x1111111111111111111111111111111111111111", toWad(1));
             throw null;
-         } catch (error) {
-             assert.ok(error.message.includes("invalid caller"));
-         }
+        } catch (error) {
+            assert.ok(error.message.includes("unauthorized caller"));
+        }
      });
 });
