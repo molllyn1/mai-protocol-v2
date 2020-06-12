@@ -6,8 +6,6 @@ import "../interface/IPerpetual.sol";
 
 contract ContractReader {
     struct GovParams {
-        uint256 withdrawalLockBlockCount;
-        uint256 brokerLockBlockCount;
         LibTypes.PerpGovernanceConfig perpGovernanceConfig;
         LibTypes.AMMGovernanceConfig ammGovernanceConfig;
         address amm; // AMM contract address
@@ -29,8 +27,6 @@ contract ContractReader {
 
     struct AccountStorage {
         LibTypes.MarginAccount margin;
-        LibTypes.DelayedVariable broker;
-        LibTypes.DelayedVariable withdrawalLock;
     }
 
     function getGovParams(address perpetualAddress) public view returns (GovParams memory params) {
@@ -65,7 +61,44 @@ contract ContractReader {
     {
         IPerpetual perpetual = IPerpetual(perpetualAddress);
         params.margin = perpetual.getMarginAccount(trader);
-        params.broker = perpetual.getBroker(trader);
-        params.withdrawalLock = perpetual.getWithdrawalLock(trader);
     }
+
+    /////////////////////////////////////////////////////
+    // backward compatibility - beta
+
+    function getBetaAccountStorage(address perpetualAddress, address trader)
+        public
+        view
+        returns (AccountStorage memory params)
+    {
+        IBetaPerpetual perpetual = IBetaPerpetual(perpetualAddress);
+        IBetaPerpetual.BetaCollateralAccount memory collateral = perpetual.getCashBalance(trader);
+        IBetaPerpetual.BetaPositionAccount memory position = perpetual.getPosition(trader);
+
+        params.margin.side = position.side;
+        params.margin.size = position.size;
+        params.margin.entryValue = position.entryValue;
+        params.margin.entrySocialLoss = position.entrySocialLoss;
+        params.margin.entryFundingLoss = position.entryFundingLoss;
+        params.margin.cashBalance = collateral.balance;
+    }
+}
+
+interface IBetaPerpetual {
+    struct BetaCollateralAccount {
+        int256 balance;
+        int256 appliedBalance;
+        uint256 appliedHeight;
+    }
+
+    struct BetaPositionAccount {
+        LibTypes.Side side;
+        uint256 size;
+        uint256 entryValue;
+        int256 entrySocialLoss;
+        int256 entryFundingLoss;
+    }
+
+    function getCashBalance(address guy) external view returns (BetaCollateralAccount memory);
+    function getPosition(address guy) external view returns (BetaPositionAccount memory);
 }
