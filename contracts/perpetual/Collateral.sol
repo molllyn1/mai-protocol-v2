@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
-import "../lib/LibUtils.sol";
 import "./PerpetualGovernance.sol";
 
 /**
@@ -24,8 +23,6 @@ contract Collateral is PerpetualGovernance {
 
     event Deposit(address indexed trader, int256 wadAmount, int256 balance);
     event Withdraw(address indexed trader, int256 wadAmount, int256 balance);
-    event Transfer(address indexed from, address indexed to, int256 wadAmount, int256 balanceFrom, int256 balanceTo);
-    event InternalUpdateBalance(address indexed trader, int256 wadAmount, int256 balance);
 
     /**
      * @dev Constructor of Collateral contract. Initialize collateral type and decimals.
@@ -119,50 +116,6 @@ contract Collateral is PerpetualGovernance {
     }
 
     /**
-     * @dev Update the cash balance of a collateral account. Depends on the signed of given amount,
-     *      it could be increasing (for positive amount) or decreasing (for negative amount).
-     *
-     * @param trader    Address of account owner.
-     * @param wadAmount Amount of balance to be update. Both positive and negative are avaiable.
-     * @return Internal representation of the raw amount.
-     */
-    function updateBalance(address trader, int256 wadAmount) internal {
-        marginAccounts[trader].cashBalance = marginAccounts[trader].cashBalance.add(wadAmount);
-        emit InternalUpdateBalance(trader, wadAmount, marginAccounts[trader].cashBalance);
-    }
-
-    /**
-     * @dev Check a trader's cash balance, return the negative part and set the cash balance to 0
-     *      if possible.
-     *
-     * @param trader    Address of account owner.
-     * @return A loss equals to the negative part of trader's cash balance before operating.
-     */
-    function ensurePositiveBalance(address trader) internal returns (uint256 loss) {
-        if (marginAccounts[trader].cashBalance < 0) {
-            loss = marginAccounts[trader].cashBalance.neg().toUint256();
-            marginAccounts[trader].cashBalance = 0;
-        }
-    }
-
-    /**
-     * @dev Like erc20's 'transferFrom', transfer internal balance from one account to another.
-     *
-     * @param from      Address of the cash balance transferred from.
-     * @param to        Address of the cash balance transferred to.
-     * @param wadAmount Amount of the balance to be transferred.
-     */
-    function transferBalance(address from, address to, int256 wadAmount) internal {
-        if (wadAmount == 0) {
-            return;
-        }
-        require(wadAmount > 0, "invalid transfer amount");
-        marginAccounts[from].cashBalance = marginAccounts[from].cashBalance.sub(wadAmount); // may be negative balance
-        marginAccounts[to].cashBalance = marginAccounts[to].cashBalance.add(wadAmount);
-        emit Transfer(from, to, wadAmount, marginAccounts[from].cashBalance, marginAccounts[to].cashBalance);
-    }
-
-    /**
      * @dev Convert the represention of amount from raw to internal.
      *
      * @param rawAmount Amount with decimals of collateral.
@@ -175,10 +128,10 @@ contract Collateral is PerpetualGovernance {
     /**
      * @dev Convert the represention of amount from internal to raw.
      *
-     * @param wadAmount Amount with internal decimals.
+     * @param amount Amount with internal decimals.
      * @return Amount with decimals of collateral.
      */
-    function toCollateral(int256 wadAmount) internal view returns (uint256) {
-        return wadAmount.div(scaler).toUint256();
+    function toCollateral(int256 amount) internal view returns (uint256) {
+        return amount.div(scaler).toUint256();
     }
 }

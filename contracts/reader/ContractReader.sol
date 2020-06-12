@@ -3,8 +3,6 @@ pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibTypes.sol";
 import "../interface/IPerpetual.sol";
-import "../interface/IGlobalConfig.sol";
-
 
 contract ContractReader {
     struct GovParams {
@@ -37,9 +35,6 @@ contract ContractReader {
 
     function getGovParams(address perpetualAddress) public view returns (GovParams memory params) {
         IPerpetual perpetual = IPerpetual(perpetualAddress);
-        IGlobalConfig globalConfig = IGlobalConfig(perpetual.globalConfig());
-        params.withdrawalLockBlockCount = globalConfig.withdrawalLockBlockCount();
-        params.brokerLockBlockCount = globalConfig.brokerLockBlockCount();
         params.perpGovernanceConfig = perpetual.getGovernance();
         params.ammGovernanceConfig = perpetual.amm().getGovernance();
         params.amm = address(perpetual.amm());
@@ -56,7 +51,7 @@ contract ContractReader {
         params.shortSocialLossPerContract = perpetual.socialLossPerContract(LibTypes.Side.SHORT);
         params.insuranceFundBalance = perpetual.insuranceFundBalance();
 
-        params.isEmergency = perpetual.status() == LibTypes.Status.SETTLING;
+        params.isEmergency = perpetual.status() == LibTypes.Status.EMERGENCY;
         params.isGlobalSettled = perpetual.status() == LibTypes.Status.SETTLED;
         params.globalSettlePrice = perpetual.settlementPrice();
 

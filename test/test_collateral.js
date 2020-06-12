@@ -42,11 +42,7 @@ contract('TestCollateral', accounts => {
         return cashAccount.cashBalance;
     }
 
-    const appliedBalanceOf = async (user) => {
-        return await vault.currentAppliedWithdrawal(user);
-    }
-
-    describe("exceptions", async () => {
+    describe("constructor - exceptions", async () => {
         beforeEach(deploy);
 
         it ("constructor - invalid decimals", async () => {
@@ -67,51 +63,23 @@ contract('TestCollateral', accounts => {
             }
         });
 
-        it('withdraw - negtive amount', async () => {
-            await collateral.transfer(u1, toWad(10));
-            await collateral.approve(vault.address, infinity, { from: u1 });
-            await vault.depositPublic(toWad(3.1415), { from: u1 });
-
-            await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-            await increaseBlockBy(4);
-
+        it ("constructor - decimals out of range", async () => {
             try {
-                await vault.withdrawPublic(0, { from: u1 });
+                const col = await TestCollateral.new("0x0000000000000000000000000000000000000000", -1);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"), error);
-            }
-            assert.equal(await cashBalanceOf(u1), toWad(3.1415));
-
-            try {
-                await vault.withdrawPublic(toWad(-3.1415), { from: u1 });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("uint256 overflow"), error);
-            }
-        });
-
-        it('withdraw - negtive amount', async () => {
-
-            await collateral.transfer(u1, toWad(10));
-            await collateral.approve(vault.address, infinity, { from: u1 });
-            await vault.depositPublic(toWad(3.1415), { from: u1 });
-
-            await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-            await increaseBlockBy(4);
-
-            try {
-                await vault.withdrawPublic(toWad(3.1416), { from: u1 });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("insufficient balance"));
+                assert.ok(error.message.includes("decimals out of range"));
             }
         });
     });
 
-    describe("deposit / withdraw ether", async () => {
+    describe("deposit / withdraw - ether", async () => {
         beforeEach(async () => {
             vault = await TestCollateral.new("0x0000000000000000000000000000000000000000", 18);
+        });
+
+        it('isTokenizedCollateral', async () => {
+            assert.ok(!(await vault.isTokenizedCollateralPublic()));
         });
 
         it('deposit', async () => {
@@ -140,23 +108,121 @@ contract('TestCollateral', accounts => {
         it('withdraw', async () => {
             await vault.depositPublic(toWad(0.01), { from: u1, value: toWad(0.01) });
             assert.equal(fromWad(await cashBalanceOf(u1)), 0.01);
-
-            try {
-                await vault.withdrawPublic(toWad(0.005), { from: u1 });
-            } catch (error) {
-                assert.ok(error.message.includes("insufficient applied balance"), error);
-            }
-
-            await vault.applyForWithdrawalPublic(toWad(0.005), 5, { from: u1 });
-            await increaseBlockBy(5);
-
             await vault.withdrawPublic(toWad(0.005), { from: u1 });
             assert.equal(await cashBalanceOf(u1), toWad(0.005));
         });
+
+        it('pullCollateral', async() => {
+            await collateral.transfer(u1, toWad(1000));
+            const balanceBefore = await web3.eth.getBalance(u1);
+            assert.equal(await vault.pullCollateralPublic.call(u1, toWad(1000)), toWad(1000));
+            const balanceAfter = await web3.eth.getBalance(u1);
+            assert.equal(balanceBefore, balanceAfter);
+        });
+
+        it('pushCollateral', async() => {
+            await vault.depositPublic(toWad(1000), { from: admin, value: toWad(1000) });
+            assert.equal(await web3.eth.getBalance(vault.address), toWad(1000));
+
+            const balanceBefore = await web3.eth.getBalance(u1);
+            await vault.pushCollateralPublic(u1, toWad(1000));
+            const balanceAfter = await web3.eth.getBalance(u1);
+            assert.equal(new BigNumber(balanceAfter).minus(new BigNumber(balanceBefore)), toWad(1000));
+
+            try {
+                await vault.pushCollateralPublic(u1, 1);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("insufficient balance"));
+            }
+        });
     });
 
-    describe("deposit / withdraw", async () => {
+    describe("deposit / withdraw - token", async () => {
+        beforeEach(deploy);
 
+        it('isTokenizedCollateral', async () => {
+            assert.ok(await vault.isTokenizedCollateralPublic());
+        });
+
+        it('deposit', async () => {
+            await collateral.transfer(u1, toWad(10));
+            await collateral.approve(vault.address, infinity, { from: u1 });
+            await vault.depositPublic(toWad(3.1415), { from: u1 });
+            assert.equal(await cashBalanceOf(u1), toWad(3.1415));
+
+            assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
+        });
+
+        it('deposit too much', async () => {
+            try {
+                await vault.depositPublic(toWad(30.1415), { from: u1 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("low-level call failed"), error);
+            }
+        });
+
+        it('withdraw', async () => {
+            await collateral.transfer(u1, toWad(10));
+            await collateral.approve(vault.address, infinity, { from: u1 });
+
+            await vault.depositPublic(toWad(10), { from: u1 });
+
+            await vault.withdrawPublic(toWad(3.1415), { from: u1 });
+            assert.equal(await cashBalanceOf(u1), toWad(6.8585));
+
+            await vault.withdrawPublic(toWad(6.0), { from: u1 });
+            assert.equal(await cashBalanceOf(u1), toWad(0.8585));
+
+            await vault.withdrawPublic(toWad(0.8585), { from: u1 });
+            assert.equal(await cashBalanceOf(u1), toWad(0));
+
+            try {
+                await vault.withdrawPublic(1, { from: u1 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("insufficient balance"));
+            }
+        });
+
+        it('pullCollateral', async() => {
+            await collateral.approve(vault.address, infinity, { from: u1 });
+            try {
+                assert.equal(await vault.pullCollateralPublic(u1, toWad(1000)), toWad(1000));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("low-level call failed"), error);
+            }
+            await collateral.transfer(u1, toWad(1000));
+            assert.equal(await collateral.balanceOf(u1), toWad(1000));
+            assert.equal(await vault.pullCollateralPublic.call(u1, toWad(1000)), toWad(1000));
+            await vault.pullCollateralPublic(u1, toWad(1000));
+            assert.equal(await collateral.balanceOf(u1), 0);
+
+        });
+
+        it('pushCollateral', async() => {
+            await collateral.approve(vault.address, infinity, { from: admin });
+            await collateral.transfer(vault.address, toWad(1000));
+
+            assert.equal(await collateral.balanceOf(vault.address), toWad(1000));
+            assert.equal(await collateral.balanceOf(u1), toWad(0));
+            await vault.pushCollateralPublic(u1, toWad(1000));
+            assert.equal(await collateral.balanceOf(vault.address), toWad(0));
+            assert.equal(await collateral.balanceOf(u1), toWad(1000));
+
+            try {
+                await vault.pushCollateralPublic(u1, 1);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("low-level call failed"));
+            }
+        });
+
+    });
+
+    describe("decimals", async () => {
         const toDecimals = (x, decimals) => {
             let n = new BigNumber(x).times(new BigNumber(10 ** decimals));
             return n.toFixed();
@@ -171,273 +237,29 @@ contract('TestCollateral', accounts => {
             }
         });
 
-        it("decimals == 18", async () => {
-            await deploy(18);
+        it("decimals ~ 0 => 18", async () => {
+            for (var i = 0; i <= 18; i++) {
+                await deploy(i);
 
-            const raw = toDecimals(1, 18);
-            const wad = toWad(1);
+                const raw = toDecimals(1, i);
+                const wad = toWad(1);
 
-            await collateral.transfer(u1, raw);
-            await collateral.approve(vault.address, infinity, { from: u1 });
-            assert.equal(await collateral.balanceOf(u1), raw);
+                await collateral.transfer(u1, raw);
+                await collateral.approve(vault.address, infinity, { from: u1 });
+                assert.equal(await collateral.balanceOf(u1), raw);
 
-            await vault.depositPublic(raw, { from: u1 });
-            assert.equal(await cashBalanceOf(u1), wad);
+                await vault.depositPublic(raw, { from: u1 });
+                assert.equal(await cashBalanceOf(u1), wad);
 
-            await vault.applyForWithdrawalPublic(raw, 5, { from: u1 });
-            await increaseBlockBy(4);
-            await vault.withdrawPublic(raw, { from: u1 });
-            assert.equal(await cashBalanceOf(u1), 0);
+                await vault.withdrawPublic(raw, { from: u1 });
+                assert.equal(await cashBalanceOf(u1), 0);
 
-            assert.equal(await collateral.balanceOf(u1), raw);
-        });
+                assert.equal(await collateral.balanceOf(u1), raw);
 
-        it("decimals == 8", async () => {
-            await deploy(8);
-
-            const raw = toDecimals(3.14159265, 8);
-            const wad = toWad(3.14159265);
-
-            await collateral.transfer(u1, raw);
-            await collateral.approve(vault.address, infinity, { from: u1 });
-            assert.equal(await collateral.balanceOf(u1), raw);
-
-            await vault.depositPublic(raw, { from: u1 });
-            assert.equal(await cashBalanceOf(u1), wad);
-
-            await vault.applyForWithdrawalPublic(raw, 5, { from: u1 });
-            await increaseBlockBy(4);
-            await vault.withdrawPublic(raw, { from: u1 });
-            assert.equal(await cashBalanceOf(u1), 0);
-
-            assert.equal(await collateral.balanceOf(u1), raw);
-        });
-
-        it("decimals == 5", async () => {
-            await deploy(5);
-
-            const raw = toDecimals(3.14159, 5);
-            const wad = toWad(3.14159);
-
-            await collateral.transfer(u1, raw);
-            await collateral.approve(vault.address, infinity, { from: u1 });
-            assert.equal(await collateral.balanceOf(u1), raw);
-
-            await vault.depositPublic(raw, { from: u1 });
-            assert.equal(await cashBalanceOf(u1), wad);
-
-            await vault.applyForWithdrawalPublic(raw, 5, { from: u1 });
-            await increaseBlockBy(4);
-            await vault.withdrawPublic(raw, { from: u1 });
-            assert.equal(await cashBalanceOf(u1), 0);
-
-            assert.equal(await collateral.balanceOf(u1), raw);
+                assert.equal(await vault.toWadPublic(raw), wad);
+                assert.equal(await vault.toCollateralPublic(wad), raw);
+            }
         });
     });
 
-
-    describe("deposit / withdraw", async () => {
-        beforeEach(deploy);
-
-        describe("deposit", async () => {
-            it('deposit', async () => {
-                await collateral.transfer(u1, toWad(10));
-                await collateral.approve(vault.address, infinity, { from: u1 });
-                await vault.depositPublic(toWad(3.1415), { from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415));
-
-                assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
-            });
-
-            it('deposit too much', async () => {
-                try {
-                    await vault.depositPublic(toWad(30.1415), { from: u1 });
-                    throw null;
-                } catch (error) {
-                    assert.ok(error.message.includes("low-level call failed"), error);
-                }
-            });
-        });
-
-        describe("applyToWithdraw", async () => {
-
-            it('initial application applied immediately', async () => {
-                await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-            });
-
-            it('cannot change before previous applied', async () => {
-                await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                await vault.applyForWithdrawalPublic(toWad(20), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                // blknum +1
-                await vault.applyForWithdrawalPublic(toWad(30), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                // blknum +4
-                await increaseBlockBy(4);
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                // blknum +1
-                await increaseBlockBy(1);
-                assert.equal(await appliedBalanceOf(u1), toWad(30));
-            });
-
-            it('ignore unchanged value', async () => {
-                await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                await vault.applyForWithdrawalPublic(toWad(20), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                // blknum +1
-                await vault.applyForWithdrawalPublic(toWad(20), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                // blknum +3
-                await increaseBlockBy(3);
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-
-                // blknum +1
-                await increaseBlockBy(2);
-                assert.equal(await appliedBalanceOf(u1), toWad(20));
-            });
-
-        })
-
-        describe("withdraw", async () => {
-            it('withdraw with no application', async () => {
-                await collateral.transfer(u1, toWad(10));
-                await collateral.approve(vault.address, infinity, { from: u1 });
-                await vault.depositPublic(toWad(10), { from: u1 });
-                try {
-                    await vault.withdrawPublic(toWad(3.1415), { from: u1 });
-                    throw null;
-                } catch (error) {
-                    assert.ok(error.message.includes("insufficient applied balance"));
-                }
-            });
-
-            it('withdrawal will decrease applied balance', async () => {
-                await collateral.transfer(u1, toWad(10));
-                await collateral.approve(vault.address, infinity, { from: u1 });
-                await vault.depositPublic(toWad(10), { from: u1 });
-
-                await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-                await vault.withdrawPublic(toWad(3.1415), { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(6.8585));
-            });
-
-            it('delayed update will overwrite applied balance', async () => {
-                await collateral.transfer(u1, toWad(10));
-                await collateral.approve(vault.address, infinity, { from: u1 });
-                await vault.depositPublic(toWad(10), { from: u1 });
-
-                await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-                await vault.applyForWithdrawalPublic(toWad(20), 5, { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(10));
-                await vault.withdrawPublic(toWad(3.1415), { from: u1 });
-                assert.equal(await appliedBalanceOf(u1), toWad(6.8585));
-
-                await increaseBlockBy(5);
-                assert.equal(await appliedBalanceOf(u1), toWad(20));
-            });
-
-            it('withdraw', async () => {
-                await collateral.transfer(u1, toWad(10));
-                await collateral.approve(vault.address, infinity, { from: u1 });
-                await vault.depositPublic(toWad(10), { from: u1 });
-
-                await vault.applyForWithdrawalPublic(toWad(10), 5, { from: u1 });
-                await increaseBlockBy(4);
-
-                await vault.withdrawPublic(toWad(3.1415), { from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(6.8585));
-
-                await vault.withdrawPublic(toWad(6.8585), { from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(0));
-
-                assert.equal(await collateral.balanceOf(u1), toWad(10));
-            });
-        });
-    });
-
-    describe("cash flow", async () => {
-
-        beforeEach(async () => {
-            await deploy();
-            await collateral.transfer(u1, toWad(10));
-            await collateral.approve(vault.address, infinity, { from: u1 });
-            await vault.depositPublic(toWad(3.1415), { from: u1 });
-        });
-
-        describe("updateBalance", async () => {
-
-            it('updateBalance', async () => {
-                await vault.updateBalancePublic(toWad(2), { from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(5.1415));
-                assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
-
-                await vault.updateBalancePublic(toWad(-2), { from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415));
-                assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
-
-                await vault.updateBalancePublic(toWad(-10), { from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415, -10));
-                assert.equal(await collateral.balanceOf(u1), toWad(10, -3.1415));
-            });
-
-            it('updateBalance', async () => {
-                await vault.updateBalancePublic(toWad(2), { from: u1 });
-                await vault.ensurePositiveBalancePublic({ from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(5.1415));
-
-                await vault.updateBalancePublic(toWad(-2), { from: u1 });
-                let loss = await vault.ensurePositiveBalancePublic.call({ from: u1 });
-                await vault.ensurePositiveBalancePublic({ from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415));
-                assert.equal(loss, 0);
-
-                await vault.updateBalancePublic(toWad(-10), { from: u1 });
-                loss = await vault.ensurePositiveBalancePublic.call({ from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415, -10));
-                assert.equal(loss, toWad(10, -3.1415));
-
-                await vault.ensurePositiveBalancePublic({ from: u1 });
-                assert.equal(await cashBalanceOf(u1), toWad(0));
-            });
-        });
-
-
-        describe("transferBalance", async () => {
-
-            beforeEach(async () => {
-                await collateral.transfer(u2, toWad(10));
-                await collateral.approve(vault.address, infinity, { from: u2 });
-                await vault.depositPublic(toWad(3.1415), { from: u2 });
-            });
-
-            it('normal', async () => {
-                await vault.transferBalancePublic(u1, u2, toWad(1));
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415, -1));
-                assert.equal(await cashBalanceOf(u2), toWad(3.1415, 1));
-            });
-
-            it('too much', async () => {
-                await vault.transferBalancePublic(u1, u2, toWad(99));
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415, -99));
-                assert.equal(await cashBalanceOf(u2), toWad(3.1415, 99));
-            });
-
-            it('transfer 0', async () => {
-                await vault.transferBalancePublic(u1, u2, toWad(0));
-                assert.equal(await cashBalanceOf(u1), toWad(3.1415));
-                assert.equal(await cashBalanceOf(u2), toWad(3.1415));
-            });
-        });
-    });
 });

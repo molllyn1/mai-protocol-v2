@@ -102,7 +102,7 @@ contract PerpetualProxy {
     }
 
     function trade(address guy, LibTypes.Side side, uint256 price, uint256 amount) public onlyAMM returns (uint256) {
-        (uint256 opened, uint256 _) = perpetual.tradePosition(guy, self(), side, price, amount);
+        (uint256 opened, ) = perpetual.tradePosition(guy, self(), side, price, amount);
         return opened;
     }
 

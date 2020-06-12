@@ -11,7 +11,6 @@ contract PerpetualGovernance is PerpetualStorage {
 
     event EnterEmergencyStatus();
     event EnterSettledStatus();
-
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
     event UpdateGovernanceAddress(bytes32 indexed key, address value);
 
@@ -59,10 +58,10 @@ contract PerpetualGovernance is PerpetualStorage {
             require(governance.lotSize == 0 || value.toUint256().mod(governance.lotSize) == 0, "require tls % ls == 0");
             governance.tradingLotSize = value.toUint256();
         } else if (key == "longSocialLossPerContracts") {
-            require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+            require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
             socialLossPerContracts[uint256(LibTypes.Side.LONG)] = value;
         } else if (key == "shortSocialLossPerContracts") {
-            require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+            require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
             socialLossPerContracts[uint256(LibTypes.Side.SHORT)] = value;
         } else {
             revert("key not exists");
@@ -99,6 +98,6 @@ contract PerpetualGovernance is PerpetualStorage {
     function setSettledStatus() internal {
         require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
         status = LibTypes.Status.SETTLED;
-        event EnterSettledStatus();
+        emit EnterSettledStatus();
     }
 }

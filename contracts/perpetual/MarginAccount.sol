@@ -16,13 +16,15 @@ contract MarginAccount is Collateral {
         uint256 perpetualTotalSize,
         uint256 price
     );
+
     event UpdateInsuranceFund(int256 newVal);
+    event Transfer(address indexed from, address indexed to, int256 wadAmount, int256 balanceFrom, int256 balanceTo);
+    event InternalUpdateBalance(address indexed trader, int256 wadAmount, int256 balance);
 
     constructor(address _collateral, uint256 _collateralDecimals)
         public
         Collateral(_collateral, _collateralDecimals)
-    {
-    }
+    {}
 
     /**
       * @dev Calculate max amount can be liquidated to trader's acccount.
@@ -375,5 +377,49 @@ contract MarginAccount is Collateral {
         socialLossPerContracts[uint256(side)] = newLossPerContract;
 
         emit SocialLoss(side, newLossPerContract);
+    }
+
+     /**
+     * @dev Update the cash balance of a collateral account. Depends on the signed of given amount,
+     *      it could be increasing (for positive amount) or decreasing (for negative amount).
+     *
+     * @param trader    Address of account owner.
+     * @param wadAmount Amount of balance to be update. Both positive and negative are avaiable.
+     * @return Internal representation of the raw amount.
+     */
+    function updateBalance(address trader, int256 wadAmount) internal {
+        marginAccounts[trader].cashBalance = marginAccounts[trader].cashBalance.add(wadAmount);
+        emit InternalUpdateBalance(trader, wadAmount, marginAccounts[trader].cashBalance);
+    }
+
+    /**
+     * @dev Check a trader's cash balance, return the negative part and set the cash balance to 0
+     *      if possible.
+     *
+     * @param trader    Address of account owner.
+     * @return A loss equals to the negative part of trader's cash balance before operating.
+     */
+    function ensurePositiveBalance(address trader) internal returns (uint256 loss) {
+        if (marginAccounts[trader].cashBalance < 0) {
+            loss = marginAccounts[trader].cashBalance.neg().toUint256();
+            marginAccounts[trader].cashBalance = 0;
+        }
+    }
+
+    /**
+     * @dev Like erc20's 'transferFrom', transfer internal balance from one account to another.
+     *
+     * @param from      Address of the cash balance transferred from.
+     * @param to        Address of the cash balance transferred to.
+     * @param wadAmount Amount of the balance to be transferred.
+     */
+    function transferBalance(address from, address to, int256 wadAmount) internal {
+        if (wadAmount == 0) {
+            return;
+        }
+        require(wadAmount > 0, "invalid transfer amount");
+        marginAccounts[from].cashBalance = marginAccounts[from].cashBalance.sub(wadAmount); // may be negative balance
+        marginAccounts[to].cashBalance = marginAccounts[to].cashBalance.add(wadAmount);
+        emit Transfer(from, to, wadAmount, marginAccounts[from].cashBalance, marginAccounts[to].cashBalance);
     }
 }

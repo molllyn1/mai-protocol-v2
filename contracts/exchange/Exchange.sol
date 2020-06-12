@@ -2,12 +2,11 @@ pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibMath.sol";
-
 import "../lib/LibOrder.sol";
 import "../lib/LibSignature.sol";
+import "../interface/IGlobalConfig.sol";
 import "../interface/IPerpetual.sol";
 import "../interface/IAMM.sol";
-
 
 contract Exchange {
     using LibMathSigned for int256;
@@ -17,6 +16,8 @@ contract Exchange {
     using LibSignature for LibSignature.OrderSignature;
 
     uint256 public constant SUPPORTED_ORDER_VERSION = 2;
+
+    IGlobalConfig public globalConfig;
 
     mapping(bytes32 => uint256) public filled;
     mapping(bytes32 => bool) public cancelled;
@@ -30,12 +31,17 @@ contract Exchange {
     event MatchWithAMM(address perpetual, LibOrder.OrderParam takerOrderParam, uint256 amount);
     event Cancel(bytes32 indexed orderHash);
 
+    constructor(address _globalConfig) public {
+        globalConfig = IGlobalConfig(_globalConfig);
+    }
+
     function matchOrders(
         LibOrder.OrderParam memory takerOrderParam,
         LibOrder.OrderParam[] memory makerOrderParams,
         address _perpetual,
         uint256[] memory amounts
     ) public {
+        require(globalConfig.authorizedBrokers(msg.sender), "unauthorized broker");
         require(amounts.length > 0 && makerOrderParams.length == amounts.length, "no makers to match");
         require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
 
@@ -122,10 +128,8 @@ contract Exchange {
         address _perpetual,
         uint256 amount
     ) public {
-        if (amount == 0) {
-            return;
-        }
-
+        require(globalConfig.authorizedBrokers(msg.sender), "unauthorized broker");
+        require(amount >= 0, "invalid amount");
         require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
 
         IPerpetual perpetual = IPerpetual(_perpetual);

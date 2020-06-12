@@ -41,7 +41,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
 
     // Admin functions
     function setCashBalance(address trader, int256 amount) public onlyWhitelistAdmin {
-        require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+        require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
         int256 deltaAmount = amount.sub(marginAccounts[trader].cashBalance);
         marginAccounts[trader].cashBalance = amount;
         emit InternalUpdateBalance(trader, deltaAmount, amount);
@@ -103,10 +103,6 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         withdrawImplementation(msg.sender, rawAmount);
     }
 
-    function applyForWithdrawal(uint256 rawAmount) public nonReentrant {
-        Collateral.applyForWithdrawal(msg.sender, rawAmount, globalConfig.withdrawalLockBlockCount());
-    }
-
     function settle() public nonReentrant {
         require(status == LibTypes.Status.SETTLED, "wrong perpetual status");
 
@@ -117,7 +113,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
             return;
         }
         uint256 rawAmount = toCollateral(wadAmount);
-        Collateral.withdraw(trader, rawAmount, true);
+        Collateral.withdraw(trader, rawAmount);
     }
 
     // Deposit && Withdraw - Whitelisted Only
@@ -152,10 +148,6 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
 
     function availableMargin(address trader) public returns (int256) {
         return availableMarginWithPrice(trader, markPrice());
-    }
-
-    function drawableBalance(address trader) public returns (int256) {
-        return drawableBalanceWithPrice(trader, markPrice());
     }
 
     // safe for liquidation
@@ -221,7 +213,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         onlyWhitelisted
         returns (uint256 takerOpened, uint256 makerOpened)
     {
-        require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
+        require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
         require(amount.mod(governance.tradingLotSize) == 0, "invalid trading lot size");
 
@@ -233,8 +225,8 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     function transferCashBalance(address from, address to, uint256 amount) public onlyWhitelisted {
-        require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
-        Collateral.transferBalance(from, to, amount.toInt256());
+        require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
+        MarginAccount.transferBalance(from, to, amount.toInt256());
     }
 
     function registerNewTrader(address trader) internal {
@@ -290,8 +282,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         require(isSafeWithPrice(trader, currentMarkPrice), "unsafe before withdraw");
 
         remargin(trader, currentMarkPrice);
-        bool forced = (currentBroker(trader) == address(0));
-        Collateral.withdraw(trader, rawAmount, forced);
+        Collateral.withdraw(trader, rawAmount);
 
         require(isSafeWithPrice(trader, currentMarkPrice), "unsafe after withdraw");
         require(availableMarginWithPrice(trader, currentMarkPrice) >= 0, "withdraw margin");

@@ -1,7 +1,10 @@
 pragma solidity 0.5.15;
 
 interface IGlobalConfig {
-    function withdrawalLockBlockCount() external view returns (uint256);
 
-    function brokerLockBlockCount() external view returns (uint256);
+    function authorizedBrokers(address broker) external view returns (bool);
+
+    function addAuthorizedBroker() external;
+
+    function removeAuthorizedBroker() external;
 }

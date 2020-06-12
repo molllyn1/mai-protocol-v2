@@ -31,16 +31,19 @@ contract TestPerpetual is Perpetual {
         public
         returns (uint256)
     {
-        require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
+        require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
         require(amount.mod(governance.tradingLotSize) == 0, "invalid trading lot size");
+        return MarginAccount.trade(trader, side, price, amount);
+    }
 
-        uint256 opened = MarginAccount.trade(trader, side, price, amount);
-        if (side == LibTypes.Side.LONG) {
-            emit Buy(trader, price, amount);
-        } else if (side == LibTypes.Side.SHORT) {
-            emit Sell(trader, price, amount);
-        }
-        return opened;
+    function addSocialLossPerContract(LibTypes.Side side, int256 amount) internal {
+        require(amount >= 0, "negtive social loss");
+        int256 newVal = socialLossPerContracts[uint256(side)].add(amount);
+        socialLossPerContracts[uint256(side)] = newVal;
+    }
+
+    function setSocialLossPerContractPublic(LibTypes.Side side, int256 value) public {
+        addSocialLossPerContract(side, value.sub(socialLossPerContract(side)));
     }
 }

@@ -7,27 +7,31 @@ import "../perpetual/Collateral.sol";
 contract TestCollateral is Collateral {
     constructor(address _collateral, uint256 decimals) public Collateral(_collateral, decimals) {}
 
+    function isTokenizedCollateralPublic() public view returns (bool) {
+        return isTokenizedCollateral();
+    }
+
     function depositPublic(uint256 amount) public payable {
         deposit(msg.sender, amount);
     }
 
-    function applyForWithdrawalPublic(uint256 amount, uint256 delay) public {
-        applyForWithdrawal(msg.sender, amount, delay);
-    }
-
     function withdrawPublic(uint256 amount) public {
-        withdraw(msg.sender, amount, false);
+        withdraw(msg.sender, amount);
     }
 
-    function updateBalancePublic(int256 amount) public {
-        updateBalance(msg.sender, amount);
+    function pullCollateralPublic(address trader, uint256 rawAmount) public returns (int256 wadAmount) {
+        return pullCollateral(trader, rawAmount);
     }
 
-    function ensurePositiveBalancePublic() public returns (uint256 loss) {
-        return ensurePositiveBalance(msg.sender);
+    function pushCollateralPublic(address payable trader, uint256 rawAmount) public returns (int256 wadAmount) {
+        return pushCollateral(trader, rawAmount);
     }
 
-    function transferBalancePublic(address from, address to, uint256 amount) public {
-        transferBalance(from, to, amount.toInt256());
+    function toWadPublic(uint256 rawAmount) public view returns (int256) {
+        return toWad(rawAmount);
+    }
+
+    function toCollateralPublic(int256 amount) public view returns (uint256) {
+        return toCollateral(amount);
     }
 }

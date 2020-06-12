@@ -23,10 +23,6 @@ contract TestMarginAccount is MarginAccount {
         return maintenanceMarginWithPrice(guy, markPrice);
     }
 
-    function drawableBalanceWithPricePublic(address guy, uint256 markPrice) public returns (int256) {
-        return drawableBalanceWithPrice(guy, markPrice);
-    }
-
     function pnlWithPricePublic(address guy, uint256 markPrice) public returns (int256) {
         return pnlWithPrice(guy, markPrice);
     }
@@ -35,12 +31,8 @@ contract TestMarginAccount is MarginAccount {
         deposit(msg.sender, amount);
     }
 
-    function applyForWithdrawalPublic(uint256 amount, uint256 delay) public {
-        applyForWithdrawal(msg.sender, amount, delay);
-    }
-
     function withdrawPublic(uint256 amount) public {
-        withdraw(msg.sender, amount, false);
+        withdraw(msg.sender, amount);
     }
 
     function increaseTotalSizePublic(LibTypes.Side side, uint256 amount) public {
@@ -78,5 +70,17 @@ contract TestMarginAccount is MarginAccount {
 
     function remarginPublic(address guy, uint256 price) public {
         remargin(guy, price);
+    }
+
+    function updateBalancePublic(int256 amount) public {
+        updateBalance(msg.sender, amount);
+    }
+
+    function ensurePositiveBalancePublic() public returns (uint256 loss) {
+        return ensurePositiveBalance(msg.sender);
+    }
+
+    function transferBalancePublic(address from, address to, uint256 amount) public {
+        transferBalance(from, to, amount.toInt256());
     }
 }

@@ -1,6 +1,6 @@
 const Exchange = artifacts.require('exchange/Exchange.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 
 module.exports = async function (deployer, network, accounts) {
     const exchange = await Exchange.deployed();

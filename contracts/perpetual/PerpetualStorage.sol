@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
-import "../lib/LibUtils.sol";
 
 import "../interface/IAMM.sol";
 import "../interface/IGlobalConfig.sol";
@@ -15,7 +14,6 @@ import "../interface/IGlobalConfig.sol";
 contract PerpetualStorage is WhitelistedRole {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
-    using LibUtils for bytes32;
 
     // Global configuation instance address
     IGlobalConfig public globalConfig;
