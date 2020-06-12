@@ -50,7 +50,7 @@ contract Exchange {
 
         uint256 tradingLotSize = perpetual.getGovernance().tradingLotSize;
         bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
-        uint256 takerFilledAmount = stateStorage.filled(_perpetual, takerOrderHash);
+        uint256 takerFilledAmount = stateStorage.filled(takerOrderHash);
         uint256 takerOpened;
 
         for (uint256 i = 0; i < makerOrderParams.length; i++) {
@@ -66,7 +66,7 @@ contract Exchange {
             validatePrice(takerOrderParam, makerOrderParams[i]);
 
             bytes32 makerOrderHash = validateOrderParam(perpetual, makerOrderParams[i]);
-            uint256 makerFilledAmount = stateStorage.filled(_perpetual, makerOrderHash);
+            uint256 makerFilledAmount = stateStorage.filled(makerOrderHash);
 
             require(amounts[i] <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
             require(amounts[i] <= makerOrderParams[i].amount.sub(makerFilledAmount), "maker overfilled");
@@ -75,7 +75,7 @@ contract Exchange {
             uint256 opened = fillOrder(perpetual, takerOrderParam, makerOrderParams[i], amounts[i]);
 
             takerOpened = takerOpened.add(opened);
-            stateStorage.setFilled(_perpetual, makerOrderHash, makerFilledAmount.add(amounts[i]));
+            stateStorage.setFilled(makerOrderHash, makerFilledAmount.add(amounts[i]));
             takerFilledAmount = takerFilledAmount.add(amounts[i]);
         }
 
@@ -87,7 +87,7 @@ contract Exchange {
         }
         require(perpetual.isSafe(msg.sender), "broker unsafe");
 
-        stateStorage.setFilled(_perpetual, takerOrderHash, takerFilledAmount);
+        stateStorage.setFilled(takerOrderHash, takerFilledAmount);
     }
 
     function fillOrder(
@@ -137,7 +137,7 @@ contract Exchange {
         require(amount.mod(perpetual.getGovernance().tradingLotSize) == 0, "invalid trading lot size");
 
         bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
-        uint256 takerFilledAmount = stateStorage.filled(_perpetual, takerOrderHash);
+        uint256 takerFilledAmount = stateStorage.filled(takerOrderHash);
         require(amount <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
 
         // trading with pool
@@ -153,7 +153,7 @@ contract Exchange {
         } else {
             takerOpened = amm.buyFromWhitelisted(takerOrderParam.trader, amount, price, takerOrderParam.getExpiredAt());
         }
-        stateStorage.setFilled(_perpetual, takerOrderHash, takerFilledAmount.add(amount));
+        stateStorage.setFilled(takerOrderHash, takerFilledAmount.add(amount));
 
         emit MatchWithAMM(_perpetual, takerOrderParam, amount);
     }
@@ -188,8 +188,8 @@ contract Exchange {
         require(orderParam.chainId() >= getChainId(), "");
 
         bytes32 orderHash = orderParam.getOrderHash(address(perpetual), broker);
-        require(!stateStorage.isCancelled(address(perpetual), orderHash), "cancelled order");
-        require(stateStorage.filled(address(perpetual), orderHash) < orderParam.amount, "fullfilled order");
+        require(!stateStorage.cancelled(orderHash), "cancelled order");
+        require(stateStorage.filled(orderHash) < orderParam.amount, "fullfilled order");
 
         address signerAddress = orderParam.signature.getSignerAddress(orderHash);
         require(signerAddress == orderParam.trader || stateStorage.isDelegate(address(perpetual), orderParam.trader, signerAddress), "invalid signer");
@@ -211,7 +211,7 @@ contract Exchange {
     function cancelOrder(LibOrder.Order memory order) public {
         require(msg.sender == order.broker, "invalid caller");
         bytes32 orderHash = order.getOrderHash();
-        stateStorage.setCancelled(order.perpetual, orderHash);
+        stateStorage.setCancelled(orderHash);
         emit Cancel(orderHash);
     }
 

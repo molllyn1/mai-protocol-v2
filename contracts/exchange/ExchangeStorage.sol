@@ -1,81 +1,82 @@
 pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
+import "@openzeppelin/contracts/ownership/Ownable.sol";
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
-
 
 interface IWhitelist {
     function isWhitelisted(address guy) external view returns (bool);
 }
 
 
-contract ExchangeStorage {
+contract ExchangeStorage is Ownable {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
-    event SetDelegate(address indexed perpetual, address indexed owner, address indexed delegate);
-    event UnsetDelegate(address indexed perpetual, address indexed owner, address indexed lastDelegate);
+    address public authorizedExchange;
 
-    struct State {
-        mapping(bytes32 => uint256) filled;
-        mapping(bytes32 => bool) cancelled;
-        mapping(address => address) delegates;
-    }
+    mapping(bytes32 => uint256) public filled;
+    mapping(bytes32 => bool) public cancelled;
+    mapping(address => mapping(address => address)) public delegates;
 
-    mapping(address => State) states;
+    event UpdateAuthorizedExchange(address indexed oldExchange, address indexed newExchange);
+    event UpdateDelegate(address indexed owner, address indexed perpetual, address indexed delegate);
 
     constructor() public {}
 
-    function isWhitelisted(address perpetual) public view returns (bool) {
-        return IWhitelist(perpetual).isWhitelisted(msg.sender);
+    function setAuthorizedExchange(address newExchange) external onlyOwner {
+        require(authorizedExchange != newExchange, "already authorized");
+        emit UpdateAuthorizedExchange(authorizedExchange, newExchange);
+        authorizedExchange = newExchange;
     }
 
-    function filled(address perpetual, bytes32 orderHash) public view returns (uint256) {
-        return states[perpetual].filled[orderHash];
+    modifier authorizedExchangeOnly() {
+        require(msg.sender == authorizedExchange, "unauthorized exchange");
+        _;
     }
 
-    function setFilled(
-        address perpetual,
-        bytes32 orderHash,
-        uint256 amount
-    ) external {
-        require(isWhitelisted(perpetual), "caller not whitelisted");
-
-        State storage state = states[perpetual];
-        require(amount >= state.filled[orderHash], "decreasing filled");
-        state.filled[orderHash] = state.filled[orderHash].add(amount);
+    function setFilled(bytes32 orderHash, uint256 amount)
+        external
+        authorizedExchangeOnly
+    {
+        require(amount >= filled[orderHash], "decreasing filled");
+        filled[orderHash] = filled[orderHash].add(amount);
     }
 
-    function isCancelled(address perpetual, bytes32 orderHash) public view returns (bool) {
-        return states[perpetual].cancelled[orderHash];
+    function setCancelled(bytes32 orderHash)
+        external
+        authorizedExchangeOnly
+    {
+        cancelled[orderHash] = true;
     }
 
-    function setCancelled(address perpetual, bytes32 orderHash) external returns (uint256) {
-        require(isWhitelisted(perpetual), "caller not whitelisted");
-        states[perpetual].cancelled[orderHash] = true;
-    }
-
-    function getDelegate(address perpetual, address owner) public view returns (address) {
-        return states[perpetual].delegates[owner];
+    function getDelegate(address perpetual, address owner)
+        public
+        view
+        returns (address)
+    {
+        return delegates[perpetual][owner];
     }
 
     function isDelegate(
         address perpetual,
         address owner,
         address delegate
-    ) public view returns (bool) {
+    )
+        public
+        view
+        returns (bool)
+    {
         return getDelegate(perpetual, owner) == delegate;
     }
 
-    function setDelegate(address perpetual, address delegate) external {
+    function setDelegate(address perpetual, address delegate) public {
         require(!isDelegate(perpetual, msg.sender, delegate), "delegate already set");
-        states[perpetual].delegates[msg.sender] = delegate;
-        emit SetDelegate(perpetual, msg.sender, delegate);
+        delegates[perpetual][msg.sender] = delegate;
+        emit UpdateDelegate(perpetual, msg.sender, delegate);
     }
 
-    function unsetDelegate(address perpetual) external {
-        require(!isDelegate(perpetual, msg.sender, address(0x0)), "delegate unset");
-        emit UnsetDelegate(perpetual, msg.sender, states[perpetual].delegates[msg.sender]);
-        states[perpetual].delegates[msg.sender] = address(0x0);
+    function unsetDelegate(address perpetual) public {
+        setDelegate(perpetual, address(0x0));
     }
 }
