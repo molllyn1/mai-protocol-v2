@@ -44,7 +44,6 @@ contract Exchange {
         IPerpetual perpetual = IPerpetual(_perpetual);
         require(perpetual.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
 
-        uint256 tradingLotSize = perpetual.getGovernance().tradingLotSize;
         bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
         uint256 takerFilledAmount = filled[takerOrderHash];
         uint256 takerOpened;
@@ -66,7 +65,6 @@ contract Exchange {
 
             require(amounts[i] <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
             require(amounts[i] <= makerOrderParams[i].amount.sub(makerFilledAmount), "maker overfilled");
-            require(amounts[i].mod(tradingLotSize) == 0, "invalid trading lot size");
 
             uint256 opened = fillOrder(perpetual, takerOrderParam, makerOrderParams[i], amounts[i]);
 
@@ -93,8 +91,13 @@ contract Exchange {
         uint256 amount
     ) internal returns (uint256) {
         uint256 price = makerOrderParam.getPrice();
-        uint256 takerOpened = perpetual.tradePosition(takerOrderParam.trader, takerOrderParam.side(), price, amount);
-        uint256 makerOpened = perpetual.tradePosition(makerOrderParam.trader, makerOrderParam.side(), price, amount);
+        (uint256 takerOpened, uint256 makerOpened) = perpetual.tradePosition(
+            takerOrderParam.trader,
+            makerOrderParam.trader,
+            takerOrderParam.side(),
+            price,
+            amount
+        );
 
         // trading fee
         int256 takerTradingFee = amount.wmul(price).toInt256().wmul(takerOrderParam.takerFeeRate());
@@ -129,8 +132,6 @@ contract Exchange {
 
         IPerpetual perpetual = IPerpetual(_perpetual);
         IAMM amm = IAMM(perpetual.amm());
-
-        require(amount.mod(perpetual.getGovernance().tradingLotSize) == 0, "invalid trading lot size");
 
         bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
         uint256 takerFilledAmount = filled[takerOrderHash];
@@ -167,7 +168,7 @@ contract Exchange {
         require(takerOrderParam.isSell() ? takerPrice <= makerPrice : takerPrice >= makerPrice, "price not match");
     }
 
-    function getChainId() internal pure returns (uint256 id) {
+    function getChainId() public pure returns (uint256 id) {
         assembly {
             id := chainid()
         }

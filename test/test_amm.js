@@ -22,7 +22,7 @@ const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
 const gasLimit = 8000000;
@@ -124,27 +124,27 @@ contract('amm', accounts => {
     };
 
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
 
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
 
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
 
     const positionEntryFundingLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryFundingLoss;
     }
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     beforeEach(async () => {
@@ -173,11 +173,12 @@ contract('amm', accounts => {
         });
 
         it("invalid broker", async () => {
+            await priceFeeder.setPrice(toWad(6000));
             try {
                 await amm.buy(toWad(1), toWad(10000), infinity);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid broker"), error);
+                assert.ok(error.message.includes("invalid broker"));
             }
         });
 
@@ -296,8 +297,6 @@ contract('amm', accounts => {
 
             // create amm
             assertApproximate(assert, fromWad(await amm.currentAvailableMargin.call()), 0); // amm.x
-            await perpetual.addSocialLossPerContractPublic(Side.LONG, toWad(100));
-            await perpetual.addSocialLossPerContractPublic(Side.SHORT, toWad(33));
             await amm.setAccumulatedFundingPerContract(toWad(50));
             await perpetual.deposit(toWad(7000 * 100 * 2.1), {
                 from: u1
@@ -315,15 +314,6 @@ contract('amm', accounts => {
         it("without loss", async () => {
             // await inspect(proxy.address);
             assertApproximate(assert, fromWad(await amm.currentAvailableMargin.call()), 700000); // amm.x
-        });
-
-        it("loss is increasing", async () => {
-            // await inspect(proxy.address);
-
-            await perpetual.addSocialLossPerContractPublic(Side.LONG, toWad(100));
-            await perpetual.addSocialLossPerContractPublic(Side.SHORT, toWad(100)); // useless
-            await amm.setAccumulatedFundingPerContract(toWad(100));
-            assertApproximate(assert, fromWad(await amm.currentAvailableMargin.call()), 700000 - 100 * 100 - 50 * 100); // amm.x
         });
     });
 
@@ -640,7 +630,6 @@ contract('amm', accounts => {
             assert.equal(fromWad(await positionSize(u2)), 0);
             assert.equal(await positionSide(u2), Side.FLAT);
         });
-
 
         // TODO: buy - success - amount is very close to amm.positionSize
         // TODO: buy - fail - amount >= amm.positionSize

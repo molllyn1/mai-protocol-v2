@@ -52,11 +52,12 @@ interface IPerpetual {
     function isIMSafeWithPrice(address guy, uint256 currentMarkPrice) external returns (bool);
 
     function tradePosition(
-        address guy,
+        address taker,
+        address maker,
         LibTypes.Side side,
         uint256 price,
         uint256 amount
-    ) external returns (uint256);
+    ) external returns (uint256, uint256);
 
     function transferCashBalance(
         address from,
@@ -66,9 +67,7 @@ interface IPerpetual {
 
     function setBrokerFor(address guy, address broker) external;
 
-    function depositFor(address guy, uint256 amount) external;
-
-    function depositEtherFor(address guy) external payable;
+    function depositFor(address guy, uint256 amount) external payable;
 
     function withdrawFor(address payable guy, uint256 amount) external;
 

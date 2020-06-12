@@ -26,4 +26,21 @@ contract TestPerpetual is Perpetual {
         totalSizes[1] = value;
         totalSizes[2] = value;
     }
+
+    function oneSideTradePublic(address trader, LibTypes.Side side, uint256 price, uint256 amount)
+        public
+        returns (uint256)
+    {
+        require(status != LibTypes.Status.SETTLING, "wrong perpetual status");
+        require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
+        require(amount.mod(governance.tradingLotSize) == 0, "invalid trading lot size");
+
+        uint256 opened = MarginAccount.trade(trader, side, price, amount);
+        if (side == LibTypes.Side.LONG) {
+            emit Buy(trader, price, amount);
+        } else if (side == LibTypes.Side.SHORT) {
+            emit Sell(trader, price, amount);
+        }
+        return opened;
+    }
 }

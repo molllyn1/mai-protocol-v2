@@ -13,11 +13,18 @@ contract PerpetualGovernance is PerpetualStorage {
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
     event UpdateGovernanceAddress(bytes32 indexed key, address value);
 
+    // Modifier to check if amm address is set.
     modifier ammRequired() {
         require(address(amm) != address(0), "no automated market maker");
         _;
     }
 
+    /**
+      * @dev Set governance parameters.
+      *
+      * @param key   Name of parameter.
+      * @param value Value of parameter.
+      */
     function setGovernanceParameter(bytes32 key, int256 value) public onlyWhitelistAdmin {
         if (key == "initialMarginRate") {
             governance.initialMarginRate = value.toUint256();
@@ -61,6 +68,12 @@ contract PerpetualGovernance is PerpetualStorage {
         emit UpdateGovernanceParameter(key, value);
     }
 
+    /**
+      * @dev Set governance address. like set governance parameter.
+      *
+      * @param key   Name of parameter.
+      * @param value Address to set.
+      */
     function setGovernanceAddress(bytes32 key, address value) public onlyWhitelistAdmin {
         require(value != address(0), "invalid address");
         if (key == "dev") {

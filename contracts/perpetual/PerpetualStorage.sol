@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
-import "../lib/LibDelayedVariable.sol";
 import "../lib/LibUtils.sol";
 
 import "../interface/IAMM.sol";
@@ -16,7 +15,6 @@ import "../interface/IGlobalConfig.sol";
 contract PerpetualStorage is WhitelistedRole {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
-    using LibDelayedVariable for LibTypes.DelayedVariable;
     using LibUtils for bytes32;
 
     // Global configuation instance address
@@ -44,8 +42,6 @@ contract PerpetualStorage is WhitelistedRole {
     int256 internal scaler;
     // Mapping from owner to its margin account
     mapping (address => LibTypes.MarginAccount) internal marginAccounts;
-    mapping (address => LibTypes.DelayedVariable) internal brokers;
-    mapping (address => LibTypes.DelayedVariable) internal withdrawalLocks;
 
     // TODO: Should be SocialLoss but to compatible off-line part
     event SocialLoss(LibTypes.Side side, int256 newVal);
@@ -62,23 +58,6 @@ contract PerpetualStorage is WhitelistedRole {
     }
 
     /**
-     * @dev Increase social loss per contract on given side.
-     *
-     * @param side Side of position.
-     * @param loss Amount of loss to handle.
-     */
-    function handleSocialLoss(LibTypes.Side side, int256 loss) internal {
-        require(side != LibTypes.Side.FLAT, "side can't be flat");
-        require(loss >= 0, "loss must be positive");
-
-        int256 newSocialLoss = loss.wdiv(totalSize(side).toInt256());
-        int256 newLossPerContract = socialLossPerContracts[uint256(side)].add(newSocialLoss);
-        socialLossPerContracts[uint256(side)] = newLossPerContract;
-
-        emit SocialLoss(side, newLossPerContract);
-    }
-
-    /**
      * @dev Help to get total opend position size of every side.
      *      FLAT is always 0 and LONG should always equal to SHORT.
      *
@@ -87,16 +66,6 @@ contract PerpetualStorage is WhitelistedRole {
      */
     function totalSize(LibTypes.Side side) public view returns (uint256) {
         return totalSizes[uint256(side)];
-    }
-
-    /**
-     * @dev Return current broker of a margin account.
-     *
-     * @param trader   Address of the account owner.
-     * @return Address of broker, return 0x0 if never set.
-     */
-    function currentBroker(address trader) public view returns (address) {
-        return brokers[trader].appliedValue().toAddress();
     }
 
     /**
@@ -116,25 +85,5 @@ contract PerpetualStorage is WhitelistedRole {
      */
     function getMarginAccount(address trader) public view returns (LibTypes.MarginAccount memory) {
         return marginAccounts[trader];
-    }
-
-    /**
-     * @dev Get underlaying data structure of withdraw lock.
-     *
-     * @param trader Address of the account owner.
-     * @return Withdrawal lock data.
-     */
-    function getWithdrawalLock(address trader) public view returns (LibTypes.DelayedVariable memory) {
-        return withdrawalLocks[trader];
-    }
-
-    /**
-     * @dev Get underlaying data structure of broker.
-     *
-     * @param trader Address of the account owner.
-     * @return Broker data.
-     */
-    function getBroker(address trader) public view returns (LibTypes.DelayedVariable memory) {
-        return brokers[trader];
     }
 }

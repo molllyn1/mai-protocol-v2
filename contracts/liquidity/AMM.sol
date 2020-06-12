@@ -5,7 +5,7 @@ import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 
 import "../lib/LibTypes.sol";
 import "../interface/IPriceFeeder.sol";
-import "../interface/IPerpetualProxy.sol";
+import "../interface/IPerpetual.sol";
 import "../token/ShareToken.sol";
 import "./AMMGovernance.sol";
 
@@ -18,8 +18,8 @@ contract AMM is AMMGovernance {
 
     // interfaces
     ShareToken private shareToken;
-    IPerpetualProxy public perpetualProxy;
     IPriceFeeder public priceFeeder;
+    IPerpetual public perpetualProxy;
 
     // funding
     LibTypes.FundingState internal fundingState;
@@ -29,7 +29,7 @@ contract AMM is AMMGovernance {
 
     constructor(address _perpetualProxy, address _priceFeeder, address _shareToken) public {
         priceFeeder = IPriceFeeder(_priceFeeder);
-        perpetualProxy = IPerpetualProxy(_perpetualProxy);
+        perpetualProxy = IPerpetual(_perpetualProxy);
         shareToken = ShareToken(_shareToken);
 
         emit CreateAMM();
@@ -45,7 +45,7 @@ contract AMM is AMMGovernance {
     }
 
     function positionSize() public view returns (uint256) {
-        return perpetualProxy.positionSize();
+        return perpetualProxy.getMarginAccount(tradingAccount()).size;
     }
 
     // note: last* functions (lastFundingState, lastAvailableMargin, lastFairPrice, etc.) are calculated based on
@@ -56,18 +56,18 @@ contract AMM is AMMGovernance {
     }
 
     function lastAvailableMargin() internal view returns (uint256) {
-        IPerpetualProxy.PoolAccount memory pool = perpetualProxy.getPoolAccount();
-        return availableMarginFromPoolAccount(pool);
+        LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
+        return availableMarginFromPoolAccount(account);
     }
 
     function lastFairPrice() internal view returns (uint256) {
-        IPerpetualProxy.PoolAccount memory pool = perpetualProxy.getPoolAccount();
-        return fairPriceFromPoolAccount(pool);
+        LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
+        return fairPriceFromPoolAccount(account);
     }
 
     function lastPremium() internal view returns (int256) {
-        IPerpetualProxy.PoolAccount memory pool = perpetualProxy.getPoolAccount();
-        return premiumFromPoolAccount(pool);
+        LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
+        return premiumFromPoolAccount(account);
     }
 
     function lastEMAPremium() internal view returns (int256) {
@@ -139,11 +139,14 @@ contract AMM is AMMGovernance {
         return fundingState.accumulatedFundingPerContract;
     }
 
+    function tradingAccount() internal view returns (address) {
+        return address(perpetualProxy);
+    }
+
     function createPool(uint256 amount) public {
         require(amount > 0, "amount must be greater than zero");
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(positionSize() == 0, "pool not empty");
-        require(amount.mod(perpetualProxy.lotSize()) == 0, "amount must be divisible by lotSize");
 
         address trader = msg.sender;
         uint256 blockTime = getBlockTimestamp();
@@ -152,8 +155,14 @@ contract AMM is AMMGovernance {
         (newIndexPrice, newIndexTimestamp) = indexPrice();
 
         initFunding(newIndexPrice, blockTime);
-        perpetualProxy.transferBalanceIn(trader, newIndexPrice.wmul(amount).mul(2));
-        uint256 opened = perpetualProxy.trade(trader, LibTypes.Side.SHORT, newIndexPrice, amount);
+        perpetualProxy.transferCashBalance(trader, tradingAccount(), newIndexPrice.wmul(amount).mul(2));
+        (uint256 opened, ) = perpetualProxy.tradePosition(
+            trader,
+            tradingAccount(),
+            LibTypes.Side.SHORT,
+            newIndexPrice,
+            amount
+        );
         mintShareTokenTo(trader, amount);
 
         forceFunding(); // x, y changed, so fair price changed. we need funding now
@@ -170,20 +179,25 @@ contract AMM is AMMGovernance {
 
     function buyFrom(address trader, uint256 amount, uint256 limitPrice, uint256 deadline) private returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
-        require(amount.mod(perpetualProxy.tradingLotSize()) == 0, "invalid trading lot size");
 
         uint256 price = getBuyPrice(amount);
         require(limitPrice >= price, "price limited");
         require(getBlockTimestamp() <= deadline, "deadline exceeded");
-        uint256 opened = perpetualProxy.trade(trader, LibTypes.Side.LONG, price, amount);
+        (uint256 opened, ) = perpetualProxy.tradePosition(
+            trader,
+            tradingAccount(),
+            LibTypes.Side.LONG,
+            price,
+            amount
+        );
 
         uint256 value = price.wmul(amount);
         uint256 fee = value.wmul(governance.poolFeeRate);
         uint256 devFee = value.wmul(governance.poolDevFeeRate);
         address devAddress = perpetualProxy.devAddress();
 
-        perpetualProxy.transferBalanceIn(trader, fee);
-        perpetualProxy.transferBalanceTo(trader, devAddress, devFee);
+        perpetualProxy.transferCashBalance(trader, tradingAccount(), fee);
+        perpetualProxy.transferCashBalance(trader, devAddress, devFee);
 
         forceFunding(); // x, y changed, so fair price changed. we need funding now
         mustSafe(trader, opened);
@@ -212,19 +226,24 @@ contract AMM is AMMGovernance {
 
     function sellFrom(address trader, uint256 amount, uint256 limitPrice, uint256 deadline) private returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
-        require(amount.mod(perpetualProxy.tradingLotSize()) == 0, "invalid trading lot size");
 
         uint256 price = getSellPrice(amount);
         require(limitPrice <= price, "price limited");
         require(getBlockTimestamp() <= deadline, "deadline exceeded");
-        uint256 opened = perpetualProxy.trade(trader, LibTypes.Side.SHORT, price, amount);
+        (uint256 opened, ) = perpetualProxy.tradePosition(
+            trader,
+            tradingAccount(),
+            LibTypes.Side.SHORT,
+            price,
+            amount
+        );
 
         uint256 value = price.wmul(amount);
         uint256 fee = value.wmul(governance.poolFeeRate);
         uint256 devFee = value.wmul(governance.poolDevFeeRate);
         address devAddress = perpetualProxy.devAddress();
-        perpetualProxy.transferBalanceIn(trader, fee);
-        perpetualProxy.transferBalanceTo(trader, devAddress, devFee);
+        perpetualProxy.transferCashBalance(trader, tradingAccount(), fee);
+        perpetualProxy.transferCashBalance(trader, devAddress, devFee);
 
         forceFunding(); // x, y changed, so fair price changed. we need funding now
         mustSafe(trader, opened);
@@ -246,7 +265,6 @@ contract AMM is AMMGovernance {
     // sell amount, pay 2 * amount * price collateral
     function addLiquidity(uint256 amount) public {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
-        require(amount.mod(perpetualProxy.lotSize()) == 0, "invalid lot size");
 
         uint256 oldAvailableMargin;
         uint256 oldPoolPositionSize;
@@ -257,8 +275,14 @@ contract AMM is AMMGovernance {
         uint256 price = oldAvailableMargin.wdiv(oldPoolPositionSize);
 
         uint256 collateralAmount = amount.wmul(price).mul(2);
-        perpetualProxy.transferBalanceIn(trader, collateralAmount);
-        uint256 opened = perpetualProxy.trade(trader, LibTypes.Side.SHORT, price, amount);
+        perpetualProxy.transferCashBalance(trader, tradingAccount(), collateralAmount);
+        (uint256 opened, ) = perpetualProxy.tradePosition(
+            trader,
+            tradingAccount(),
+            LibTypes.Side.SHORT,
+            price,
+            amount
+        );
 
         mintShareTokenTo(trader, shareToken.totalSupply().wmul(amount).wdiv(oldPoolPositionSize));
 
@@ -277,11 +301,19 @@ contract AMM is AMMGovernance {
         require(shareToken.balanceOf(msg.sender) >= shareAmount, "shareBalance limited");
         uint256 price = oldAvailableMargin.wdiv(oldPoolPositionSize);
         uint256 amount = shareAmount.wmul(oldPoolPositionSize).wdiv(shareToken.totalSupply());
-        amount = amount.sub(amount.mod(perpetualProxy.lotSize()));
+        // align to lotSize
+        uint256 lotSize = perpetualProxy.getGovernance().lotSize;
+        amount = amount.sub(amount.mod(lotSize));
 
-        perpetualProxy.transferBalanceOut(trader, price.wmul(amount).mul(2));
+        perpetualProxy.transferCashBalance(tradingAccount(), trader, price.wmul(amount).mul(2));
         burnShareTokenFrom(trader, shareAmount);
-        uint256 opened = perpetualProxy.trade(trader, LibTypes.Side.LONG, price, amount);
+        (uint256 opened, ) = perpetualProxy.tradePosition(
+            trader,
+            tradingAccount(),
+            LibTypes.Side.LONG,
+            price,
+            amount
+        );
 
         forceFunding(); // x, y changed, so fair price changed. we need funding now
         mustSafe(trader, opened);
@@ -291,30 +323,27 @@ contract AMM is AMMGovernance {
         require(perpetualProxy.status() == LibTypes.Status.SETTLED, "wrong perpetual status");
 
         address trader = msg.sender;
-        IPerpetualProxy.PoolAccount memory pool = perpetualProxy.getPoolAccount();
-        uint256 total = availableMarginFromPoolAccount(pool);
+        LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
+        uint256 total = availableMarginFromPoolAccount(account);
         uint256 shareAmount = shareToken.balanceOf(trader);
         uint256 balance = shareAmount.wmul(total).wdiv(shareToken.totalSupply());
-        perpetualProxy.transferBalanceOut(trader, balance);
+        perpetualProxy.transferCashBalance(tradingAccount(), trader, balance);
         burnShareTokenFrom(trader, shareAmount);
     }
 
     // this is a composite function of perp.setBroker + perp.deposit + amm.buy
     // composite functions accept amount = 0
-    function depositAndBuy(uint256 depositAmount, uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public {
+    function depositAndBuy(
+        uint256 depositAmount,
+        uint256 tradeAmount,
+        uint256 limitPrice,
+        uint256 deadline
+    )
+        public
+        payable
+    {
         if (depositAmount > 0) {
-            perpetualProxy.depositFor(msg.sender, depositAmount);
-        }
-        if (tradeAmount > 0) {
-            buy(tradeAmount, limitPrice, deadline);
-        }
-    }
-
-    // this is a composite function of perp.setBroker + perp.depositEther + amm.buy
-    // composite functions accept amount = 0
-    function depositEtherAndBuy(uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public payable {
-        if (msg.value > 0) {
-            perpetualProxy.depositEtherFor.value(msg.value)(msg.sender);
+            perpetualProxy.depositFor.value(msg.value)(msg.sender, depositAmount);
         }
         if (tradeAmount > 0) {
             buy(tradeAmount, limitPrice, deadline);
@@ -323,20 +352,17 @@ contract AMM is AMMGovernance {
 
     // this is a composite function of perp.setBroker + perp.deposit + amm.sell
     // composite functions accept amount = 0
-    function depositAndSell(uint256 depositAmount, uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public {
+    function depositAndSell(
+        uint256 depositAmount,
+        uint256 tradeAmount,
+        uint256 limitPrice,
+        uint256 deadline
+    )
+        public
+        payable
+    {
         if (depositAmount > 0) {
-            perpetualProxy.depositFor(msg.sender, depositAmount);
-        }
-        if (tradeAmount > 0) {
-            sell(tradeAmount, limitPrice, deadline);
-        }
-    }
-
-    // this is a composite function of perp.setBroker + perp.depositEther + amm.sell
-    // composite functions accept amount = 0
-    function depositEtherAndSell(uint256 tradeAmount, uint256 limitPrice, uint256 deadline) public payable {
-        if (msg.value > 0) {
-            perpetualProxy.depositEtherFor.value(msg.value)(msg.sender);
+            perpetualProxy.depositFor.value(msg.value)(msg.sender, depositAmount);
         }
         if (tradeAmount > 0) {
             sell(tradeAmount, limitPrice, deadline);
@@ -367,20 +393,9 @@ contract AMM is AMMGovernance {
 
     // this is a composite function of perp.deposit + perp.setBroker + amm.addLiquidity
     // composite functions accept amount = 0
-    function depositAndAddLiquidity(uint256 depositAmount, uint256 amount) public {
+    function depositAndAddLiquidity(uint256 depositAmount, uint256 amount) public payable {
         if (depositAmount > 0) {
-            perpetualProxy.depositFor(msg.sender, depositAmount);
-        }
-        if (amount > 0) {
-            addLiquidity(amount);
-        }
-    }
-
-    // this is a composite function of perp.deposit + perp.setBroker + amm.addLiquidity
-    // composite functions accept amount = 0
-    function depositEtherAndAddLiquidity(uint256 amount) public payable {
-        if (msg.value > 0) {
-            perpetualProxy.depositEtherFor.value(msg.value)(msg.sender);
+            perpetualProxy.depositFor.value(msg.value)(msg.sender, depositAmount);
         }
         if (amount > 0) {
             addLiquidity(amount);
@@ -392,7 +407,7 @@ contract AMM is AMMGovernance {
         forceFunding();
         address devAddress = perpetualProxy.devAddress();
         if (oldIndexPrice != fundingState.lastIndexPrice) {
-            perpetualProxy.transferBalanceTo(devAddress, msg.sender, governance.updatePremiumPrize);
+            perpetualProxy.transferCashBalance(devAddress, msg.sender, governance.updatePremiumPrize);
             require(perpetualProxy.isSafe(devAddress), "dev unsafe");
         }
     }
@@ -434,37 +449,42 @@ contract AMM is AMMGovernance {
     // a gas-optimized version of currentAvailableMargin() + positionSize(). almost all formulas require these two
     function currentXY() internal returns (uint256 x, uint256 y) {
         funding();
-        IPerpetualProxy.PoolAccount memory pool = perpetualProxy.getPoolAccount();
-        x = availableMarginFromPoolAccount(pool);
-        y = pool.positionSize;
+        LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
+        x = availableMarginFromPoolAccount(account);
+        y = account.size;
     }
 
     // a gas-optimized version of lastAvailableMargin()
-    function availableMarginFromPoolAccount(IPerpetualProxy.PoolAccount memory pool) internal view returns (uint256) {
-        int256 available = pool.cashBalance;
-        available = available.sub(pool.positionEntryValue.toInt256());
-        available = available.sub(
-            pool.socialLossPerContract.wmul(pool.positionSize.toInt256()).sub(pool.positionEntrySocialLoss)
-        );
-        available = available.sub(
-            fundingState.accumulatedFundingPerContract.wmul(pool.positionSize.toInt256()).sub(
-                pool.positionEntryFundingLoss
-            )
-        );
+    function availableMarginFromPoolAccount(LibTypes.MarginAccount memory account) internal view returns (uint256) {
+        int256 available = account.cashBalance;
+        int256 socialLossPerContract = perpetualProxy.socialLossPerContract(account.side);
+        available = available.sub(account.entryValue.toInt256());
+        available = available
+            .sub(
+                socialLossPerContract
+                    .wmul(account.size.toInt256())
+                    .sub(account.entrySocialLoss)
+            );
+        available = available
+            .sub(
+                fundingState.accumulatedFundingPerContract
+                    .wmul(account.size.toInt256())
+                    .sub(account.entryFundingLoss)
+            );
         return available.max(0).toUint256();
     }
 
     // a gas-optimized version of lastFairPrice
-    function fairPriceFromPoolAccount(IPerpetualProxy.PoolAccount memory pool) internal view returns (uint256) {
-        uint256 y = pool.positionSize;
+    function fairPriceFromPoolAccount(LibTypes.MarginAccount memory account) internal view returns (uint256) {
+        uint256 y = account.size;
         require(y > 0, "funding initialization required");
-        uint256 x = availableMarginFromPoolAccount(pool);
+        uint256 x = availableMarginFromPoolAccount(account);
         return x.wdiv(y);
     }
 
     // a gas-optimized version of lastPremium
-    function premiumFromPoolAccount(IPerpetualProxy.PoolAccount memory pool) internal view returns (int256) {
-        int256 p = fairPriceFromPoolAccount(pool).toInt256();
+    function premiumFromPoolAccount(LibTypes.MarginAccount memory account) internal view returns (int256) {
+        int256 p = fairPriceFromPoolAccount(account).toInt256();
         p = p.sub(fundingState.lastIndexPrice.toInt256());
         return p;
     }
@@ -476,7 +496,7 @@ contract AMM is AMMGovernance {
             require(perpetualProxy.isIMSafeWithPrice(trader, perpetualMarkPrice), "im unsafe");
         }
         require(perpetualProxy.isSafeWithPrice(trader, perpetualMarkPrice), "sender unsafe");
-        require(perpetualProxy.isProxySafeWithPrice(perpetualMarkPrice), "amm unsafe");
+        require(perpetualProxy.isSafeWithPrice(tradingAccount(), perpetualMarkPrice), "amm unsafe");
     }
 
     function mintShareTokenTo(address trader, uint256 amount) internal {
@@ -500,23 +520,23 @@ contract AMM is AMMGovernance {
             // funding initialization required. but in this case, it's safe to just do nothing and return
             return;
         }
-        IPerpetualProxy.PoolAccount memory pool = perpetualProxy.getPoolAccount();
-        if (pool.positionSize == 0) {
+        LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
+        if (account.size == 0) {
             // empty pool. it's safe to just do nothing and return
             return;
         }
 
         if (newIndexTimestamp > fundingState.lastFundingTime) {
             // the 1st update
-            nextStateWithTimespan(pool, newIndexPrice, newIndexTimestamp);
+            nextStateWithTimespan(account, newIndexPrice, newIndexTimestamp);
         }
         // the 2nd update;
-        nextStateWithTimespan(pool, newIndexPrice, blockTime);
+        nextStateWithTimespan(account, newIndexPrice, blockTime);
 
         emit UpdateFundingRate(fundingState);
     }
 
-    function nextStateWithTimespan(IPerpetualProxy.PoolAccount memory pool, uint256 newIndexPrice, uint256 endTimestamp)
+    function nextStateWithTimespan(LibTypes.MarginAccount memory account, uint256 newIndexPrice, uint256 endTimestamp)
         private
     {
         require(fundingState.lastFundingTime != 0, "funding initialization required");
@@ -540,7 +560,7 @@ contract AMM is AMMGovernance {
 
         // always update
         fundingState.lastIndexPrice = newIndexPrice; // should update before premium()
-        fundingState.lastPremium = premiumFromPoolAccount(pool);
+        fundingState.lastPremium = premiumFromPoolAccount(account);
     }
 
     // solve t in emaPremium == y equation

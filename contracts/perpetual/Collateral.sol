@@ -3,10 +3,8 @@ pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../lib/LibDelayedVariable.sol";
 import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 import "../lib/LibUtils.sol";
@@ -19,15 +17,13 @@ import "./PerpetualGovernance.sol";
 contract Collateral is PerpetualGovernance {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
-    using LibDelayedVariable for LibTypes.DelayedVariable;
     using SafeERC20 for IERC20;
 
     // Available decimals should be within [0, 18]
     uint256 private constant MAX_DECIMALS = 18;
 
     event Deposit(address indexed trader, int256 wadAmount, int256 balance);
-    event Withdraw(address indexed trader, int256 wadAmount, int256 balance, int256 appliedCashBalance);
-    event ApplyForWithdrawal(address indexed trader, int256 wadAmount, uint256 appliedHeight);
+    event Withdraw(address indexed trader, int256 wadAmount, int256 balance);
     event Transfer(address indexed from, address indexed to, int256 wadAmount, int256 balanceFrom, int256 balanceTo);
     event InternalUpdateBalance(address indexed trader, int256 wadAmount, int256 balance);
 
@@ -75,44 +71,20 @@ contract Collateral is PerpetualGovernance {
     }
 
     /**
-     * @dev Apply to withdraw cash balance. The applied part will become unavailable for opening position.
-     *      The applied amount could be greater than cash balance.
-     *
-     * @param trader    Address of account owner.
-     * @param rawAmount Amount of collateral to be deposited in its original decimals.
-     * @param delay     Number of blocks required for the application to take effect.
-     */
-    function applyForWithdrawal(address trader, uint256 rawAmount, uint256 delay) internal {
-        int256 wadAmount = toWad(rawAmount);
-        withdrawalLocks[trader].setValueDelayed(bytes32(wadAmount), delay);
-        emit ApplyForWithdrawal(trader, wadAmount, withdrawalLocks[trader].blockHeight);
-    }
-
-    /**
      * @dev Withdraw collaterals from trader's margin account to his ethereum address.
      *      The amount to withdraw is in its original decimals.
      *
      * @param trader    Address of account owner.
      * @param rawAmount Amount of collateral to be deposited in its original decimals.
-     * @param forced    If true, the applied balance will be checked before decreasing balance.
      */
-    function withdraw(address payable trader, uint256 rawAmount, bool forced) internal {
+    function withdraw(address payable trader, uint256 rawAmount) internal {
         require(rawAmount > 0, "invalid amount");
         int256 wadAmount = toWad(rawAmount);
         require(wadAmount <= marginAccounts[trader].cashBalance, "insufficient balance");
-
-        int256 appliedCashBalance = int256(withdrawalLocks[trader].appliedValue());
-        if (!forced) {
-            require(wadAmount <= appliedCashBalance, "insufficient applied balance");
-            appliedCashBalance = appliedCashBalance.sub(wadAmount);
-        } else {
-            appliedCashBalance = appliedCashBalance.sub(wadAmount.min(appliedCashBalance));
-        }
-        withdrawalLocks[trader].setValueInstant(bytes32(appliedCashBalance));
         marginAccounts[trader].cashBalance = marginAccounts[trader].cashBalance.sub(wadAmount);
         pushCollateral(trader, rawAmount);
 
-        emit Withdraw(trader, wadAmount, marginAccounts[trader].cashBalance, appliedCashBalance);
+        emit Withdraw(trader, wadAmount, marginAccounts[trader].cashBalance);
     }
 
     /**

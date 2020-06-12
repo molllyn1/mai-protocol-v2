@@ -79,32 +79,31 @@ contract('TestPerpetual', accounts => {
     };
 
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
     const positionEntrySocialLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entrySocialLoss;
     }
     const positionEntryFundingLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryFundingLoss;
     }
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
     const appliedBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.appliedBalance;
+        return await perpetual.currentAppliedWithdrawal(user);
     }
     const isPositionBalanced = async () => {
         const long = (await perpetual.totalSize(LONG)).toString();
@@ -113,269 +112,9 @@ contract('TestPerpetual', accounts => {
         return (long == short) && (flat == "0")
     }
 
-    describe("tradePosition", async () => {
-        beforeEach(async () => {
-            await deploy();
-
-            await collateral.transfer(u1, toWad(1000));
-            await collateral.approve(perpetual.address, infinity, { from: u1 });
-
-            await perpetual.addWhitelisted(admin);
-            await perpetual.depositFor(u1, toWad(1000));
-            await perpetual.setBrokerFor(u1, admin);
-
-            await collateral.transfer(u2, toWad(1000));
-            await collateral.approve(perpetual.address, infinity, { from: u2 });
-
-            await perpetual.depositFor(u2, toWad(1000));
-            await perpetual.setBrokerFor(u2, admin);
-
-            await increaseBlockBy(5);
-            await funding.setMarkPrice(toWad(7000));
-        });
-
-        it('tradePosition - settlement', async () => {
-
-            await perpetual.beginGlobalSettlement(toWad(7000));
-            try {
-                await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("wrong perpetual status"), error);
-            }
-
-            await perpetual.endGlobalSettlement();
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
-        })
-
-        it('invalid side', async () => {
-            try {
-                await perpetual.tradePosition(u1, FLAT, toWad(7000), toWad(1));
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("invalid side"), error);
-            }
-         })
-
-        it('transferCashBalance exceptions', async () => {
-            await perpetual.beginGlobalSettlement(toWad(7000));
-            try {
-                await perpetual.transferCashBalance(u1, u2, toWad(1));
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("wrong perpetual status"), error);
-            }
-         })
-    });
-
-    describe("liquidate", async () => {
-        beforeEach(async () => {
-            await deploy();
-
-            await collateral.transfer(u1, toWad(1000));
-            await collateral.approve(perpetual.address, infinity, {
-                from: u1
-            });
-
-            await perpetual.addWhitelisted(admin);
-            await perpetual.depositFor(u1, toWad(1000));
-            await perpetual.setBrokerFor(u1, admin);
-
-            await collateral.transfer(u2, toWad(1000));
-            await collateral.approve(perpetual.address, infinity, {
-                from: u2
-            });
-
-            await perpetual.depositFor(u2, toWad(1000));
-            await perpetual.setBrokerFor(u2, admin);
-
-            await increaseBlockBy(5);
-            await funding.setMarkPrice(toWad(7000));
-        });
-
-        it('partial liquidate - lot size', async () => {
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
-            await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
-            await perpetual.setGovernanceParameter(toBytes32("lotSize"), toWad(10));
-
-            try {
-                await perpetual.liquidate(u1, toWad(1), { from: u2 });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("invalid lot size"), error);
-            }
-        })
-
-        it('partial liquidate - nothing to liquidate', async () => {
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
-            await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
-            await perpetual.setGovernanceParameter(toBytes32("lotSize"), toWad(10));
-
-            await funding.setMarkPrice(6000);
-
-            try {
-                await perpetual.liquidate(u1, toWad(0), { from: u2 });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("nothing to liquidate"), error);
-            }
-        })
-
-        it('partial liquidate - add social loss', async () => {
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
-
-            try {
-                await perpetual.liquidate(u1, toWad(1), { from: u2 });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("safe account"), error);
-            }
-
-            try {
-                await perpetual.liquidate(u1, toWad(1), { from: u2 });
-                throw null;
-            } catch (error) {
-               assert.ok(error.message.includes("safe account"), error);
-            }
-
-            await funding.setMarkPrice(toWad(5000));
-            assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 500);
-            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 250);
-            assert.equal(fromWad(await perpetual.marginBalance.call(u1)), -1000);
-            assert.equal(fromWad(await perpetual.pnl.call(u1)), -2000);
-            assert.equal(fromWad(await perpetual.availableMargin.call(u1)), -1500);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), -1500);
-            assert.equal(await perpetual.isSafe.call(u1), false);
-            assert.equal(await perpetual.isBankrupt.call(u1), true);
-
-            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 0);
-
-            try {
-                // liquidateAmount = 1
-                await perpetual.liquidate(u1, toWad(1), { from: u2 });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("liquidator margin"), error);
-            }
-
-            // partial 1
-            await perpetual.liquidate(u1, toWad(0.5), {
-                from: u2
-            });
-
-            // positionMargin: 5000 * 0.5 * 10% = 250
-            // funds: 5000 * 0.5 * 0.005 = 12.5
-            // -pnl = social loss = 12.5 * 0.5 = 6.25
-
-            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 0);
-            assert.equal(fromWad(await perpetual.socialLossPerContract(LONG)), 12.5);
-
-            assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 250);
-            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 125);
-            assert.equal(fromWad(await perpetual.marginBalance.call(u1)), -1006.25);
-            assert.equal(fromWad(await perpetual.pnl.call(u1)), -1006.25);
-            assert.equal(fromWad(await perpetual.availableMargin.call(u1)), -1256.25);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), -1256.25);
-            assert.equal(await perpetual.isSafe.call(u1), false);
-            assert.equal(await perpetual.isBankrupt.call(u1), true);
-
-            assert.equal(fromWad(await cashBalanceOf(u2)), 1000 + 12.5);
-            assert.equal(fromWad(await perpetual.positionMargin.call(u2)), 250);
-            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u2)), 125);
-            assert.equal(fromWad(await perpetual.marginBalance.call(u2)), 1000 + 12.5 - 6.25);
-            assert.equal(fromWad(await perpetual.pnl.call(u2)), -6.25);
-            assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 1000 + 12.5 - 6.25 - 250);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u2)), 0);
-            assert.equal(await perpetual.isSafe.call(u2), true);
-            assert.equal(await perpetual.isBankrupt.call(u2), false);
-
-            // partial 2
-            await collateral.transfer(u2, toWad(1000));
-            await perpetual.depositFor(u2, toWad(1000));
-            await perpetual.liquidate(u1, toWad(0.5), {
-                from: u2
-            });
-
-            // positionMargin: 5000 * 1 * 10% = 500
-            // funds: 5000 * 1 * 0.005 = 25
-            // social loss = 6.25 + ((1000 + 25) / totalSize) * 1 = 1031.25
-
-            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 0);
-            assert.equal(fromWad(await perpetual.socialLossPerContract(LONG)), 1031.25);
-
-            assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 0);
-            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 0);
-            assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 0);
-            assert.equal(fromWad(await perpetual.pnl.call(u1)), 0);
-            assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 0);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), 0);
-            assert.equal(await perpetual.isSafe.call(u1), true);
-            assert.equal(await perpetual.isBankrupt.call(u1), false);
-
-            assert.equal(fromWad(await cashBalanceOf(u2)), 2000 + 25);
-            assert.equal(fromWad(await perpetual.positionMargin.call(u2)), 500);
-            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u2)), 250);
-            assert.equal(fromWad(await perpetual.marginBalance.call(u2)), 2000 + 12.5 - 6.25 + 25 - 1031.25);
-            assert.equal(fromWad(await positionEntrySocialLoss(u2)), 6.25);
-            assert.equal(fromWad(await perpetual.pnl.call(u2)), 6.25 - 1031.25);
-            assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 2000 + 12.5 - 6.25 + 25 - 1031.25 - 500);
-            assert.equal(fromWad(await perpetual.drawableBalance.call(u2)), 0);
-            assert.equal(await perpetual.isSafe.call(u2), true);
-            assert.equal(await perpetual.isBankrupt.call(u2), false);
-        });
-
-        it('liquidate - long pos', async () => {
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
-            await funding.setMarkPrice(toWad(6200));
-
-            // liquidateAmount = 0.532258064516129033 // 0.7526881720430108
-            await perpetual.liquidate(u1, toWad(1), {
-                from: u2
-            });
-            // 6200 * 0.7526881720430108 * 0.05
-            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 23.333333333333333343);
-
-            await perpetual.withdrawFromInsuranceFund(toWad(23.333333333333333343), {
-                from: admin
-            });
-        });
-
-        it('liquidate - short pos', async () => {
-            await perpetual.tradePosition(u1, SHORT, toWad(7000), toWad(1));
-            await funding.setMarkPrice(toWad(7800));
-
-            // liquidateAmount = 0.730769230769230769
-            await perpetual.liquidate(u1, toWad(1), {
-                from: u2
-            });
-            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 32.222222222222222229);
-
-            await perpetual.withdrawFromInsuranceFund(toWad(32.222222222222222229), {
-                from: admin
-            });
-        });
-
-        it('liquidate 4', async () => {
-            await collateral.transfer(u2, toWad(1000));
-            await perpetual.depositFor(u2, toWad(1000));
-
-            await perpetual.tradePosition(u1, SHORT, toWad(7000), toWad(1));
-
-            await perpetual.tradePosition(u2, LONG, toWad(7000), toWad(0.5));
-
-            await funding.setMarkPrice(toWad(7800));
-            await perpetual.liquidate(u1, toWad(0.5), {
-                from: u2
-            });
-            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 19.5); // 7800 * 0.5 * 0.005
-
-            assert.equal(await positionSize(u2), 0);
-            assert.equal(fromWad(await cashBalanceOf(u2)), 2400 + 19.5);
-        });
-    });
-
     describe("division", async () => {
         beforeEach(deploy);
+
         it(':(', async () => {
             await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0));
             await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0));
@@ -390,32 +129,29 @@ contract('TestPerpetual', accounts => {
             const priceAfter = new BigNumber("7777777777777777777778");
             const amount = new BigNumber("1111111111111111113");
 
+            return;
+
             await perpetual.addWhitelisted(admin);
             await perpetual.depositFor(u1, initial);
             await perpetual.setBrokerFor(u1, admin);
 
             await increaseBlockBy(5);
 
-
             await funding.setMarkPrice(priceBefore.toFixed());
 
             // entry value = 8641.975308641975323332‬
-            await perpetual.tradePosition(u1, LONG, priceBefore.toFixed(), amount.toFixed()); // 1.11..
+            await perpetual.oneSideTradePublic(u1, LONG, priceBefore.toFixed(), amount.toFixed()); // 1.11..
 
             // available = 135.802469135802467667
             const availableBefore = new BigNumber((await perpetual.availableMargin.call(u1)).toString());
 
-            await perpetual.applyForWithdrawal(availableBefore.toFixed(), {
-                from: u1
-            });
+            await perpetual.applyForWithdrawal(availableBefore.toFixed(), { from: u1 });
             await increaseBlockBy(5);
-            await perpetual.withdraw(availableBefore.toFixed(), {
-                from: u1
-            });
+            await perpetual.withdraw(availableBefore.toFixed(), { from: u1 });
 
             funding.setMarkPrice(priceAfter.toFixed());
 
-            await perpetual.tradePosition(u1, SHORT, priceAfter.toFixed(), amount.toFixed()); // 1.11..
+            await perpetual.oneSideTradePublic(u1, SHORT, priceAfter.toFixed(), amount.toFixed()); // 1.11..
             // value = 864197530864197532335
             // actually:
             //   7777.777777777777777778 * 1.111111111111111113 - 7777.777777777777777777 * 1.111111111111111113
@@ -449,21 +185,20 @@ contract('TestPerpetual', accounts => {
         });
 
         it('insurance fund', async () => {
-
             try {
                 await perpetual.depositToInsuranceFund(toWad(10), { from: u1 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("token not acceptable"), error);
+                assert.ok(error.message.includes("invalid depositing parameter"));
             }
             try {
-                await perpetual.depositEtherToInsuranceFund({ value: 0 });
+                await perpetual.depositToInsuranceFund(0, { value: 0 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"), error);
+                assert.ok(error.message.includes("invalid amount"));
             }
 
-            await perpetual.depositEtherToInsuranceFund({ value: toWad(10.111) });
+            await perpetual.depositToInsuranceFund(toWad(10.111), { value: toWad(10.111) });
 
             let fund = await perpetual.insuranceFundBalance();
             assert.equal(fund.toString(), toWad(10.111));
@@ -474,60 +209,30 @@ contract('TestPerpetual', accounts => {
         });
 
         it('withdrawEther initial', async () => {
-            await perpetual.depositEther({
-                value: toWad(1000),
-                from: u1
-            });
+            await perpetual.deposit(toWad(1000), { value: toWad(1000), from: u1 });
+
             assert.equal(await perpetual.currentBroker(u1), "0x0000000000000000000000000000000000000000");
             assert.equal(await appliedBalanceOf(u1), toWad(0));
             assert.equal(await cashBalanceOf(u1), toWad(1000));
-            await perpetual.withdraw(toWad(500), {
-                from: u1
-            });
+
+            await perpetual.withdraw(toWad(500), { from: u1 });
             assert.equal(await appliedBalanceOf(u1), toWad(0));
             assert.equal(await cashBalanceOf(u1), toWad(500));
         });
 
         it('withdrawEther whitelist', async () => {
-            await perpetual.depositEther({
-                value: toWad(1000),
-                from: u1
-            });
-            await perpetual.setBroker("0x0000000000000000000000000000000000000222", {
-                from: u1
-            });
-            await increaseBlockBy(5);
+            await perpetual.addWhitelisted(u2);
 
-            assert.equal(await appliedBalanceOf(u1), toWad(0));
-            try {
-                await perpetual.withdraw(toWad(500), {
-                    from: u1
-                });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("insufficient applied balance"), error);
-            }
-            await perpetual.setBroker("0x0000000000000000000000000000000000000111", {
-                from: u1
-            });
+            await perpetual.depositFor(u1, toWad(1000), { value: toWad(1000), from: u2 });
+            const remaining = await web3.eth.getBalance(u1);
+
+            await perpetual.setBrokerFor(u1, "0x0000000000000000000000000000000000000222", { from: u2 });
+            await perpetual.applyForWithdrawal(toWad(500), { from: u1 });
             await increaseBlockBy(5);
-            await perpetual.withdraw(toWad(500), {
-                from: u1
-            });
+            assert.equal(await appliedBalanceOf(u1), toWad(500));
+            await perpetual.withdrawFor(u1, toWad(500), { from: u2 });
             assert.equal(await appliedBalanceOf(u1), toWad(0));
             assert.equal(await cashBalanceOf(u1), toWad(500));
-            await perpetual.setBroker("0x0000000000000000000000000000000000000112", {
-                from: u1
-            });
-            await increaseBlockBy(5);
-            try {
-                await perpetual.withdraw(toWad(300), {
-                    from: u1
-                });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("insufficient applied balance"), error);
-            }
         });
 
         it('fallback', async () => {
@@ -544,10 +249,7 @@ contract('TestPerpetual', accounts => {
             assert.equal(await cashBalanceOf(u1), toWad(0));
 
             await perpetual.addWhitelisted(admin);
-            await perpetual.depositEtherFor(u1, {
-                value: toWad(1000),
-                from: admin
-            });
+            await perpetual.depositFor(u1, toWad(1000), { value: toWad(1000), from: admin });
             assert.equal(await cashBalanceOf(u1), toWad(1000));
         });
 
@@ -555,59 +257,303 @@ contract('TestPerpetual', accounts => {
             try {
                 await perpetual.deposit(toWad(1000), { from: u1 });
             } catch (error) {
-                assert.ok(error.message.includes("token not acceptable"), error);
+                assert.ok(error.message.includes("invalid depositing parameter"));
+            }
+            try {
+                await perpetual.deposit(toWad(1000), { from: u1, value: toWad(1001) });
+            } catch (error) {
+                assert.ok(error.message.includes("invalid depositing parameter"));
             }
             await perpetual.addWhitelisted(admin);
             try {
-                await perpetual.depositFor(u1, toWad(1000), { from: admin });
+                await perpetual.depositFor(u1, toWad(1000), { from: admin, value: toWad(1001) });
             } catch (error) {
-                assert.ok(error.message.includes("token not acceptable"), error);
+                assert.ok(error.message.includes("invalid depositing parameter"));
             }
             try {
-                await perpetual.depositEtherFor("0x0000000000000000000000000000000000000000", { value: toWad(1000), from: admin });
+                await perpetual.depositFor("0x0000000000000000000000000000000000000000", toWad(1000), { value: toWad(1000), from: admin });
+                throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid guy"), error);
+                assert.ok(error.message.includes("invalid trader"));
             }
 
-            await perpetual.depositEther({
-                value: toWad(1000),
-                from: u1
-            });
+            await perpetual.deposit(toWad(1000), { from: u1, value: toWad(1000)});
             assert.equal(await cashBalanceOf(u1), toWad(1000));
-            await perpetual.depositEtherFor(u1, {
-                value: toWad(1000),
-                from: admin
-            });
+            await perpetual.depositFor(u1, toWad(1000), { from: admin, value: toWad(1000) });
             assert.equal(await cashBalanceOf(u1), toWad(2000));
 
-            await perpetual.applyForWithdrawal(toWad(2000), {
-                from: u1
-            });
+            await perpetual.applyForWithdrawal(toWad(2000), { from: u1 });
             await increaseBlockBy(5);
-            await perpetual.withdraw(toWad(2000), {
-                from: u1
-            });
+            await perpetual.withdraw(toWad(2000), { from: u1 });
             assert.equal(await cashBalanceOf(u1), toWad(0));
         });
 
-        it('depositEtherAndSetBroker - 0', async () => {
-            await perpetual.depositEtherAndSetBroker(u2, {
-                value: 0,
-                from: u1
-            });
+        it('depositAndSetBroker - 0', async () => {
+            await perpetual.depositAndSetBroker(0, u2, { value: 0, from: u1 });
             await increaseBlockBy(5);
             assert.equal(await cashBalanceOf(u1), toWad(0));
             assert.equal(await perpetual.currentBroker(u1), u2);
         });
 
-        it('depositEtherAndSetBroker', async () => {
-            await perpetual.depositEtherAndSetBroker(u2, {
-                value: toWad(1000),
-                from: u1
-            });
+        it('depositAndSetBroker', async () => {
+            await perpetual.depositAndSetBroker(toWad(1000), u2,  { value: toWad(1000), from: u1 });
             await increaseBlockBy(5);
             assert.equal(await cashBalanceOf(u1), toWad(1000));
             assert.equal(await perpetual.currentBroker(u1), u2);
+        });
+    });
+
+    describe("oneSideTradePublic", async () => {
+        beforeEach(async () => {
+            await deploy();
+
+            await collateral.transfer(u1, toWad(1000));
+            await collateral.approve(perpetual.address, infinity, { from: u1 });
+
+            await perpetual.addWhitelisted(admin);
+            await perpetual.depositFor(u1, toWad(1000));
+            await perpetual.setBrokerFor(u1, admin);
+
+            await collateral.transfer(u2, toWad(1000));
+            await collateral.approve(perpetual.address, infinity, { from: u2 });
+
+            await perpetual.depositFor(u2, toWad(1000));
+            await perpetual.setBrokerFor(u2, admin);
+
+            await increaseBlockBy(5);
+            await funding.setMarkPrice(toWad(7000));
+        });
+
+        it('oneSideTradePublic - settlement', async () => {
+
+            await perpetual.beginGlobalSettlement(toWad(7000));
+            try {
+                await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong perpetual status"));
+            }
+
+            await perpetual.endGlobalSettlement();
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
+        })
+
+        it('invalid side', async () => {
+            try {
+                await perpetual.oneSideTradePublic(u1, FLAT, toWad(7000), toWad(1));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid side"));
+            }
+         })
+
+        it('transferCashBalance exceptions', async () => {
+            await perpetual.beginGlobalSettlement(toWad(7000));
+            try {
+                await perpetual.transferCashBalance(u1, u2, toWad(1));
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("wrong perpetual status"));
+            }
+         })
+    });
+
+    describe("liquidate", async () => {
+        beforeEach(async () => {
+            await deploy();
+
+            await perpetual.addWhitelisted(admin);
+
+            await collateral.transfer(u1, toWad(1000));
+            await collateral.approve(perpetual.address, infinity, { from: u1 });
+            await perpetual.depositFor(u1, toWad(1000));
+            await perpetual.setBrokerFor(u1, admin);
+
+            await collateral.transfer(u2, toWad(1000));
+            await collateral.approve(perpetual.address, infinity, { from: u2});
+            await perpetual.depositFor(u2, toWad(1000));
+            await perpetual.setBrokerFor(u2, admin);
+
+            await collateral.transfer(u3, toWad(1000));
+            await collateral.approve(perpetual.address, infinity, { from: u3});
+            await perpetual.depositFor(u3, toWad(1000));
+            await perpetual.setBrokerFor(u3, admin);
+
+            await increaseBlockBy(5);
+            await funding.setMarkPrice(toWad(7000));
+        });
+
+        it('partial liquidate - lot size', async () => {
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
+            await perpetual.setGovernanceParameter(toBytes32("lotSize"), toWad(10));
+
+            try {
+                await perpetual.liquidate(u1, toWad(1), { from: u2 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("invalid lot size"));
+            }
+        })
+
+        it('partial liquidate - nothing to liquidate', async () => {
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
+            await perpetual.setGovernanceParameter(toBytes32("lotSize"), toWad(10));
+
+            await funding.setMarkPrice(6000);
+
+            try {
+                await perpetual.liquidate(u1, toWad(0), { from: u2 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("nothing to liquidate"));
+            }
+        })
+
+        it('partial liquidate - add social loss', async () => {
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u3, SHORT, toWad(7000), toWad(1));
+
+            try {
+                await perpetual.liquidate(u1, toWad(1), { from: u2 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("safe account"));
+            }
+
+            try {
+                await perpetual.liquidate(u1, toWad(1), { from: u2 });
+                throw null;
+            } catch (error) {
+               assert.ok(error.message.includes("safe account"));
+            }
+
+            await funding.setMarkPrice(toWad(5000));
+            assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 500);
+            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 250);
+            assert.equal(fromWad(await perpetual.marginBalance.call(u1)), -1000);
+            assert.equal(fromWad(await perpetual.pnl.call(u1)), -2000);
+            assert.equal(fromWad(await perpetual.availableMargin.call(u1)), -1500);
+            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), -1500);
+            assert.equal(await perpetual.isSafe.call(u1), false);
+            assert.equal(await perpetual.isBankrupt.call(u1), true);
+            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 0);
+
+            // partial 1
+            await perpetual.liquidate(u1, toWad(0.5), { from: u2 });
+            // positionMargin: 5000 * 0.5 * 10% = 250
+            // funds:       5000 * 0.5 * 0.005 = 12.5
+            // liquidator:  5000 * 0.5 * 0.005 = 12.5
+            // rpnl = -2000 / 2 = -1000
+            // -1000 - 25 = -1025
+            // balance = 1000
+            // remain = 1000 - 1025 = -25 -> socialloss
+
+            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 0);
+            assert.equal(fromWad(await perpetual.socialLossPerContract(SHORT)), 12.5);
+
+            assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 250);
+            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 125);
+            assert.equal(fromWad(await perpetual.marginBalance.call(u1)), -1000);
+            assert.equal(fromWad(await perpetual.pnl.call(u1)), -1000);
+            assert.equal(fromWad(await perpetual.availableMargin.call(u1)), -1250);
+            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), -1250);
+            assert.equal(await perpetual.isSafe.call(u1), false);
+            assert.equal(await perpetual.isBankrupt.call(u1), true);
+
+            assert.equal(fromWad(await cashBalanceOf(u2)), 1000 + 12.5);
+            assert.equal(fromWad(await perpetual.positionMargin.call(u2)), 250);
+            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u2)), 125);
+            assert.equal(fromWad(await perpetual.marginBalance.call(u2)), 1000 + 12.5);
+            assert.equal(fromWad(await perpetual.pnl.call(u2)), 0);
+            assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 1000 + 12.5 - 250);
+            assert.equal(fromWad(await perpetual.drawableBalance.call(u2)), 0);
+            assert.equal(await perpetual.isSafe.call(u2), true);
+            assert.equal(await perpetual.isBankrupt.call(u2), false);
+
+            // partial 2
+            await perpetual.liquidate(u1, toWad(0.5), { from: u2 });
+
+            // positionMargin: 5000 * 1 * 10% = 500
+            // funds: 5000 * 1 * 0.005 = 25
+            // social loss = 6.25 + ((1000 + 25) / totalSize) * 1 = 1031.25
+
+            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 0);
+            assert.equal(fromWad(await perpetual.socialLossPerContract(SHORT)), 1000 + 25);
+
+            assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 0);
+            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 0);
+            assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 0);
+            assert.equal(fromWad(await perpetual.pnl.call(u1)), 0);
+            assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 0);
+            assert.equal(fromWad(await perpetual.drawableBalance.call(u1)), 0);
+            assert.equal(await perpetual.isSafe.call(u1), true);
+            assert.equal(await perpetual.isBankrupt.call(u1), false);
+
+            assert.equal(fromWad(await cashBalanceOf(u2)), 1000 + 25);
+            assert.equal(fromWad(await perpetual.positionMargin.call(u2)), 500);
+            assert.equal(fromWad(await perpetual.maintenanceMargin.call(u2)), 250);
+            assert.equal(fromWad(await perpetual.marginBalance.call(u2)), 1000 + 25);
+            assert.equal(fromWad(await positionEntrySocialLoss(u2)), 0);
+            assert.equal(fromWad(await perpetual.pnl.call(u2)), 0);
+            assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 1000 + 25 - 500);
+            assert.equal(fromWad(await perpetual.drawableBalance.call(u2)), 0);
+            assert.equal(await perpetual.isSafe.call(u2), true);
+            assert.equal(await perpetual.isBankrupt.call(u2), false);
+        });
+
+        it('liquidate - long pos', async () => {
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
+            await funding.setMarkPrice(toWad(6200));
+
+            // liquidateAmount = 0.532258064516129033 // 0.7526881720430108
+            await perpetual.liquidate(u1, toWad(1), {
+                from: u2
+            });
+            // 6200 * 0.7526881720430108 * 0.05
+            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 23.333333333333333343);
+
+            await perpetual.withdrawFromInsuranceFund(toWad(23.333333333333333343), {
+                from: admin
+            });
+        });
+
+        it('liquidate - short pos', async () => {
+            await perpetual.oneSideTradePublic(u1, SHORT, toWad(7000), toWad(1));
+            await funding.setMarkPrice(toWad(7800));
+
+            // liquidateAmount = 0.730769230769230769
+            await perpetual.liquidate(u1, toWad(1), {
+                from: u2
+            });
+            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 32.222222222222222229);
+
+            await perpetual.withdrawFromInsuranceFund(toWad(32.222222222222222229), {
+                from: admin
+            });
+        });
+
+        it('liquidate 4', async () => {
+            await collateral.transfer(u2, toWad(1000));
+            await perpetual.depositFor(u2, toWad(1000));
+
+            await perpetual.oneSideTradePublic(u1, SHORT, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u2, LONG, toWad(7000), toWad(0.5));
+
+            await funding.setMarkPrice(toWad(7800));
+
+            // u1 - 800
+            // u2 + 400
+
+            assert.equal(fromWad(await perpetual.marginBalance.call(u2)), 2400);
+            assert.equal(fromWad(await perpetual.pnl.call(u2)), 400);
+
+            await perpetual.liquidate(u1, toWad(0.5), { from: u2 });
+            assert.equal(fromWad(await perpetual.insuranceFundBalance()), 19.5); // 7800 * 0.5 * 0.005
+
+            assert.equal(await positionSize(u2), 0);
+            assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 2400 + 19.5);
         });
     });
 
@@ -621,25 +567,25 @@ contract('TestPerpetual', accounts => {
                 await perpetual.withdrawFromInsuranceFund(1);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("insufficient funds"), error);
+                assert.ok(error.message.includes("insufficient funds"));
             }
             try {
-                await perpetual.depositEtherToInsuranceFund({ value: toWad(10.111)});
+                await perpetual.depositToInsuranceFund(toWad(10.111), { value: toWad(10.111)});
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("ether not acceptable"), error);
+                assert.ok(error.message.includes("invalid depositing parameter"));
             }
             try {
                 await perpetual.depositToInsuranceFund(0);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"), error);
+                assert.ok(error.message.includes("invalid amount"));
             }
             try {
                 await perpetual.depositToInsuranceFund(toWad(-10));
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("low-level call failed"), error);
+                assert.ok(error.message.includes("low-level call failed"));
             }
 
             await perpetual.depositToInsuranceFund(toWad(10.111));
@@ -651,13 +597,13 @@ contract('TestPerpetual', accounts => {
                 await perpetual.withdrawFromInsuranceFund(0);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"), error);
+                assert.ok(error.message.includes("invalid amount"));
             }
             try {
                 await perpetual.withdrawFromInsuranceFund(toWad(20));
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("insufficient funds"), error);
+                assert.ok(error.message.includes("insufficient funds"));
             }
 
             await perpetual.withdrawFromInsuranceFund(toWad(10.111));
@@ -686,51 +632,6 @@ contract('TestPerpetual', accounts => {
         });
 
 
-        it('withdraw - whitelist', async () => {
-            await collateral.transfer(u1, toWad(10000));
-            await collateral.approve(perpetual.address, infinity, {
-                from: u1
-            });
-            await perpetual.setBroker("0x0000000000000000000000000000000000000222", {
-                from: u1
-            });
-            await increaseBlockBy(5);
-
-            await perpetual.deposit(toWad(1000), {
-                from: u1
-            });
-            assert.equal(await appliedBalanceOf(u1), toWad(0));
-            try {
-                await perpetual.withdraw(toWad(500), {
-                    from: u1
-                });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("insufficient applied balance"), error);
-            }
-            await perpetual.setBroker("0x0000000000000000000000000000000000000111", {
-                from: u1
-            });
-            await increaseBlockBy(5);
-            await perpetual.withdraw(toWad(500), {
-                from: u1
-            });
-            assert.equal(await appliedBalanceOf(u1), toWad(0));
-            assert.equal(await cashBalanceOf(u1), toWad(500));
-            await perpetual.setBroker("0x0000000000000000000000000000000000000112", {
-                from: u1
-            });
-            await increaseBlockBy(5);
-            try {
-                await perpetual.withdraw(toWad(300), {
-                    from: u1
-                });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("insufficient applied balance"), error);
-            }
-        });
-
         it('deposit', async () => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, {
@@ -738,10 +639,10 @@ contract('TestPerpetual', accounts => {
             });
 
             try {
-                await perpetual.depositEther({ value: toWad(1000), from: u1});
+                await perpetual.deposit(toWad(1000), { value: toWad(1000), from: u1});
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("ether not acceptable"), error);
+                assert.ok(error.message.includes("invalid depositing parameter"));
             }
 
             await perpetual.deposit(toWad(1000), { from: u1 });
@@ -755,15 +656,15 @@ contract('TestPerpetual', accounts => {
             await perpetual.addWhitelisted(admin);
 
             try {
-                await perpetual.depositEtherFor(u1, { value: toWad(1000), from: admin });
+                await perpetual.depositFor(u1, toWad(1000), { value: toWad(1000), from: admin });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("ether not acceptable"), error);
+                assert.ok(error.message.includes("invalid depositing parameter"));
             }
             try {
                 await perpetual.depositFor("0x0000000000000000000000000000000000000000", toWad(1000), { from: admin });
             } catch (error) {
-                assert.ok(error.message.includes("invalid guy"), error);
+                assert.ok(error.message.includes("invalid trader"));
             }
 
             await perpetual.depositFor(u1, toWad(1000), { from: admin });
@@ -804,7 +705,7 @@ contract('TestPerpetual', accounts => {
                 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes(""), error);
+                assert.ok(error.message.includes(""));
             }
             await perpetual.addWhitelisted(admin);
 
@@ -879,7 +780,7 @@ contract('TestPerpetual', accounts => {
             assert.equal(fromWad(await collateral.balanceOf(u1)), 0);
 
             await funding.setMarkPrice(toWad(7000));
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
             assert.equal(fromWad(await perpetual.pnl.call(u1)), 0);
 
             // counter-party (in order to loss money to u1)
@@ -892,7 +793,7 @@ contract('TestPerpetual', accounts => {
             await perpetual.setBrokerFor(u2, admin);
 
             await increaseBlockBy(5);
-            await perpetual.tradePosition(u2, SHORT, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u2, SHORT, toWad(7000), toWad(1));
 
             // now long-position earns
             await funding.setMarkPrice(toWad(7500));
@@ -949,11 +850,7 @@ contract('TestPerpetual', accounts => {
             assert.equal(fromWad(await cashBalanceOf(u1)), 2);
             assert.equal(fromWad(await cashBalanceOf(u2)), 1998);
 
-            try {
-                await perpetual.transferCashBalancePublic(u1, u2, toWad(3));
-            } catch (error) {
-                assert.ok(error.message.includes("insufficient balance"), error);
-            }
+            await perpetual.transferCashBalancePublic(u1, u2, toWad(3));
         });
 
         it("settle", async () => {
@@ -970,15 +867,17 @@ contract('TestPerpetual', accounts => {
 
             try {
                 await perpetual.settle();
+                throw null;
             } catch (error) {
-                assert.ok(error.message.includes("wrong perpetual status"), error);
+                assert.ok(error.message.includes("wrong perpetual status"));
             }
 
             await perpetual.beginGlobalSettlement(toWad(7000));
             try {
                 await perpetual.settle();
+                throw null;
             } catch (error) {
-                assert.ok(error.message.includes("wrong perpetual status"), error);
+                assert.ok(error.message.includes("wrong perpetual status"));
             }
 
             await perpetual.endGlobalSettlement();
@@ -1009,7 +908,7 @@ contract('TestPerpetual', accounts => {
                 await perpetual.endGlobalSettlement();
                 throw null;
             } catch (error) {
-                await assert.ok(error.message.includes("wrong perpetual status"), error);
+                await assert.ok(error.message.includes("wrong perpetual status"));
             }
         });
 
@@ -1021,7 +920,7 @@ contract('TestPerpetual', accounts => {
                 await perpetual.beginGlobalSettlement(toWad(1000));
                 throw null;
             } catch (error) {
-                await assert.ok(error.message.includes("already settled"), error);
+                await assert.ok(error.message.includes("already settled"));
             }
         });
     });
@@ -1042,7 +941,7 @@ contract('TestPerpetual', accounts => {
             await increaseBlockBy(5);
 
             await funding.setMarkPrice(toWad(7000));
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
 
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
@@ -1064,7 +963,7 @@ contract('TestPerpetual', accounts => {
             assert.equal(await perpetual.isBankrupt.call(u1), false);
 
             await perpetual.depositFor(u1, toWad(690));
-            await perpetual.tradePosition(u1, LONG, toWad(6900), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(6900), toWad(1));
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 690 * 2);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 690);
             assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 700 - 100 + 690); // 700 + 690 - 100
@@ -1088,7 +987,7 @@ contract('TestPerpetual', accounts => {
             await increaseBlockBy(5);
 
             await funding.setMarkPrice(toWad(7000));
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
 
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
@@ -1111,7 +1010,7 @@ contract('TestPerpetual', accounts => {
             assert.equal(await perpetual.isBankrupt.call(u1), true);
 
             await perpetual.depositFor(u1, toWad(900 + 599));
-            await perpetual.tradePosition(u1, LONG, toWad(6000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(6000), toWad(1));
             assert.ok(fromWad(await perpetual.availableMargin.call(u1)) < 0);
 
             await perpetual.depositFor(u1, toWad(1));
@@ -1131,7 +1030,7 @@ contract('TestPerpetual', accounts => {
             await increaseBlockBy(5);
 
             await funding.setMarkPrice(toWad(7000));
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
 
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
@@ -1151,16 +1050,23 @@ contract('TestPerpetual', accounts => {
             });
 
             assert.equal(fromWad(await appliedBalanceOf(u1)), 0);
-            await perpetual.applyForWithdrawal(1, {
-                from: u1
-            });
+            await perpetual.applyForWithdrawal(1, { from: u1 });
+            await increaseBlockBy(5);
             try {
                 await perpetual.withdraw(toWad(0), {
                     from: u1
                 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("withdraw margin"), error);
+                assert.ok(error.message.includes("invalid amount"));
+            }
+            try {
+                await perpetual.withdraw(1, {
+                    from: u1
+                });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("withdraw margin"));
             }
         });
 
@@ -1177,7 +1083,7 @@ contract('TestPerpetual', accounts => {
             await increaseBlockBy(5);
             await funding.setMarkPrice(toWad(7000));
 
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
 
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
@@ -1232,7 +1138,7 @@ contract('TestPerpetual', accounts => {
             await increaseBlockBy(5);
             await funding.setMarkPrice(toWad(7000));
 
-            await perpetual.tradePosition(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
             assert.equal(await perpetual.isSafe.call(u1), true);
             assert.equal(await perpetual.isBankrupt.call(u1), false);
 
@@ -1242,7 +1148,7 @@ contract('TestPerpetual', accounts => {
                 await perpetual.withdraw(toWad(700), { from: u1 });
                 throw null;
             } catch (error) {
-                await assert.ok(error.message.includes("unsafe after withdraw"), error);
+                await assert.ok(error.message.includes("unsafe after withdraw"));
             }
             await funding.setMarkPrice(toWad(6300));
             assert.equal(await perpetual.isSafe.call(u1), false);
@@ -1251,7 +1157,7 @@ contract('TestPerpetual', accounts => {
                 await perpetual.withdraw(toWad(100), { from: u1 });
                 throw null;
             } catch (error) {
-                await assert.ok(error.message.includes("unsafe before withdraw"), error);
+                await assert.ok(error.message.includes("unsafe before withdraw"));
             }
 
             await funding.setMarkPrice(toWad(6000));
@@ -1276,7 +1182,7 @@ contract('TestPerpetual', accounts => {
             await increaseBlockBy(5);
             await funding.setMarkPrice(toWad(7000));
 
-            await perpetual.tradePosition(u1, SHORT, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, SHORT, toWad(7000), toWad(1));
 
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
@@ -1329,7 +1235,7 @@ contract('TestPerpetual', accounts => {
 
             await funding.setMarkPrice(toWad(7000));
 
-            await perpetual.tradePosition(u1, SHORT, toWad(7000), toWad(1));
+            await perpetual.oneSideTradePublic(u1, SHORT, toWad(7000), toWad(1));
 
             assert.equal(await perpetual.isIMSafe.call(u1), true);
             assert.equal(await perpetual.isIMSafeWithPrice.call(u1, toWad(7000)), true);

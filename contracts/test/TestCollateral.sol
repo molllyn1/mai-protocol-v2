@@ -7,12 +7,8 @@ import "../perpetual/Collateral.sol";
 contract TestCollateral is Collateral {
     constructor(address _collateral, uint256 decimals) public Collateral(_collateral, decimals) {}
 
-    function depositPublic(uint256 amount) public {
+    function depositPublic(uint256 amount) public payable {
         deposit(msg.sender, amount);
-    }
-
-    function depositEtherPublic() public payable {
-        deposit(msg.sender, msg.value);
     }
 
     function applyForWithdrawalPublic(uint256 amount, uint256 delay) public {

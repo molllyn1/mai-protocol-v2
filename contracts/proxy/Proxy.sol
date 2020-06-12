@@ -1,16 +1,24 @@
 pragma solidity 0.5.15;
 
+interface IAMMGetter {
+    function amm() external view returns (address);
+}
 
-contract DelegateProxy {
+contract Proxy {
 
     bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
-    constructor(address _implementation) public {
-        setImplementation(_implementation);
+    modifier authorizedOnly() {
+        require(msg.sender == IAMMGetter(implementation()).amm(), "unauthorized caller");
+        _;
+    }
+
+    constructor(address _perpetual) public {
+        setImplementation(_perpetual);
     }
 
     function () payable external {
-        _delegate(implementation());
+        _call(implementation());
     }
 
     /**
@@ -41,7 +49,7 @@ contract DelegateProxy {
     * It will return to the external caller whatever the implementation returns.
     * @param _implementation Address to delegate.
     */
-    function _delegate(address _implementation) internal {
+    function _call(address _implementation) internal authorizedOnly {
         assembly {
         // Copy msg.data. We take full control of memory in this inline assembly
         // block because it will not return to Solidity code. We overwrite the
@@ -50,7 +58,8 @@ contract DelegateProxy {
 
         // Call the implementation.
         // out and outsize are 0 because we don't know the size yet.
-        let result := delegatecall(gas, implementation, 0, calldatasize, 0, 0)
+        // let result := delegatecall(gas, _implementation, 0, calldatasize, 0, 0)
+        let result := call(gas, _implementation, 0, 0, calldatasize, 0, 0)
 
         // Copy the returned data.
         returndatacopy(0, 0, returndatasize)

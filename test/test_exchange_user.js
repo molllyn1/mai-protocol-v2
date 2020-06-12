@@ -19,7 +19,7 @@ const {
 
 const TestToken = artifacts.require('test/TestToken.sol');
 const TestFundingMock = artifacts.require('test/TestFundingMock.sol');
-const Perpetual = artifacts.require('perpetual/Perpetual.sol');
+const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
 
@@ -120,18 +120,18 @@ contract('exchange-user', accounts => {
     };
 
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
 
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
 
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     describe("exceptions", async () => {
@@ -918,18 +918,12 @@ contract('exchange-user', accounts => {
         console.log("+++++++++++++", await exchange.getChainId());
 
         await collateral.transfer(u1, toWad(10000));
-        await collateral.approve(perpetual.address, infinity, {
-            from: u1
-        });
-        await perpetual.deposit(toWad(10000), {
-            from: u1
-        });
+        await collateral.approve(perpetual.address, infinity, { from: u1 });
+        await perpetual.deposit(toWad(10000), { from: u1 });
         assert.equal(fromWad(await cashBalanceOf(u1)), 10000);
-        await perpetual.setBroker(admin, {
-            from: u1
-        });
+        await perpetual.setBroker(admin, {from: u1});
 
-        await perpetual.tradePosition(u1, LONG, toWad(6000), toWad(1));
+        await perpetual.oneSideTradePublic(u1, LONG, toWad(6000), toWad(1));
         assert.ok(await perpetual.isSafe.call(u1));
 
         assert.equal(await positionSize(u1), toWad(1));
@@ -939,8 +933,6 @@ contract('exchange-user', accounts => {
 
         assert.equal(fromWad(await perpetual.availableMargin.call(u1)), 10000 - 600);
     });
-
-    return;
 
     it("soft fee", async () => {
         await initialize(u1, 720);

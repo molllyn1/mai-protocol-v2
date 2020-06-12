@@ -102,20 +102,16 @@ contract PerpetualProxy {
     }
 
     function trade(address guy, LibTypes.Side side, uint256 price, uint256 amount) public onlyAMM returns (uint256) {
-        perpetual.tradePosition(self(), side.counterSide(), price, amount);
-        return perpetual.tradePosition(guy, side, price, amount);
+        (uint256 opened, uint256 _) = perpetual.tradePosition(guy, self(), side, price, amount);
+        return opened;
     }
 
     function setBrokerFor(address guy, address broker) public onlyAMM {
         perpetual.setBrokerFor(guy, broker);
     }
 
-    function depositFor(address guy, uint256 amount) public onlyAMM {
-        perpetual.depositFor(guy, amount);
-    }
-
-    function depositEtherFor(address guy) public payable onlyAMM {
-        perpetual.depositEtherFor.value(msg.value)(guy);
+    function depositFor(address guy, uint256 amount) public payable onlyAMM {
+        perpetual.depositFor.value(msg.value)(guy, amount);
     }
 
     function withdrawFor(address payable guy, uint256 amount) public onlyAMM {

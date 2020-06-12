@@ -67,7 +67,7 @@ contract MarginAccount is Collateral {
       * @param account    Account of account owner.
       * @param tradePrice Price used in calculation.
       * @param amount     Amount used in calculation.
-      * @return Max liquidatable amount, note this amount is not aligned to lotSize.
+      * @return PNL of given account.
       */
     function calculatePnl(LibTypes.MarginAccount memory account, uint256 tradePrice, uint256 amount)
         internal
@@ -134,7 +134,7 @@ contract MarginAccount is Collateral {
     /**
       * @dev Calculate available margin balance, which can be used to open new positions, at given mark price:
       *      An available margin could be negative:
-      *         avaiable margin balance = margin balance - margin taken by position - applied cash balance
+      *         avaiable margin balance = margin balance - margin taken by position
       *
       * @param trader    Address of account owner.
       * @param markPrice Price used in calculation.
@@ -142,25 +142,10 @@ contract MarginAccount is Collateral {
       */
     function availableMarginWithPrice(address trader, uint256 markPrice) internal returns (int256) {
         int256 marginBalance = marginBalanceWithPrice(trader, markPrice);
-        marginBalance = marginBalance.sub(marginWithPrice(trader, markPrice).toInt256());
-        int256 appliedCashBalance = int256(withdrawalLocks[trader].appliedValue());
-        return marginBalance.sub(appliedCashBalance);
+        int256 margin = marginWithPrice(trader, markPrice).toInt256();
+        return marginBalance.sub(margin);
     }
 
-    /**
-      * @dev Calculate margin balance could be withdraw from margin account at given mark price:
-      *         avaiable margin balance = margin balance - margin taken by position - applied cash balance
-      *
-      * @param trader    Address of account owner.
-      * @param markPrice Price used in calculation.
-      * @return Value of available margin balance.
-      */
-    function drawableBalanceWithPrice(address trader, uint256 markPrice) internal returns (int256) {
-        int256 marginBalance = marginBalanceWithPrice(trader, markPrice)
-            .sub(marginWithPrice(trader, markPrice).toInt256());
-        int256 appliedCashBalance = int256(withdrawalLocks[trader].appliedValue());
-        return marginBalance.min(appliedCashBalance);
-    }
 
     /**
       * @dev Calculate pnl (profit and loss) of a margin account at given mark price.
@@ -192,6 +177,9 @@ contract MarginAccount is Collateral {
         view
         returns (int256)
     {
+        if (amount == 0) {
+            return 0;
+        }
         int256 loss = socialLossPerContract(account.side).wmul(amount.toInt256());
         if (amount == account.size) {
             loss = loss.sub(account.entrySocialLoss);
@@ -211,6 +199,9 @@ contract MarginAccount is Collateral {
     }
 
     function fundingLossWithAmount(LibTypes.MarginAccount memory account, uint256 amount) internal returns (int256) {
+        if (amount == 0) {
+            return 0;
+        }
         int256 loss = amm.currentAccumulatedFundingPerContract().wmul(amount.toInt256());
         if (amount == account.size) {
             loss = loss.sub(account.entryFundingLoss);
@@ -239,10 +230,11 @@ contract MarginAccount is Collateral {
             return;
         }
         int256 rpnl = calculatePnl(account, markPrice, account.size);
+        account.cashBalance = account.cashBalance.add(rpnl);
         account.entryValue = markPrice.wmul(account.size);
         account.entrySocialLoss = socialLossPerContract(account.side).wmul(account.size.toInt256());
         account.entryFundingLoss = amm.currentAccumulatedFundingPerContract().wmul(account.size.toInt256());
-        updateBalance(trader, rpnl);
+        // updateBalance(trader, rpnl);
         emit UpdatePositionAccount(trader, account, totalSize(account.side), markPrice);
     }
 
@@ -277,6 +269,7 @@ contract MarginAccount is Collateral {
       */
     function close(LibTypes.MarginAccount memory account, uint256 price, uint256 amount) internal returns (int256) {
         int256 rpnl = calculatePnl(account, price, amount);
+        account.cashBalance = account.cashBalance.add(rpnl);
         account.entrySocialLoss = account.entrySocialLoss.wmul(account.size.sub(amount).toInt256()).wdiv(
             account.size.toInt256()
         );
@@ -293,51 +286,69 @@ contract MarginAccount is Collateral {
     }
 
     function trade(address trader, LibTypes.Side side, uint256 price, uint256 amount) internal returns (uint256) {
-        int256 rpnl;
+        // int256 rpnl;
         uint256 opened = amount;
         uint256 closed;
         LibTypes.MarginAccount memory account = marginAccounts[trader];
         if (account.size > 0 && account.side != side) {
-            closed = account.size.min(opened);
-            rpnl = close(account, price, closed);
+            closed = account.size.min(amount);
+            close(account, price, closed);
             opened = opened.sub(closed);
         }
         if (opened > 0) {
             open(account, side, price, opened);
         }
-        updateBalance(trader, rpnl);
         marginAccounts[trader] = account;
+        // updateBalance(trader, rpnl);
         emit UpdatePositionAccount(trader, account, totalSize(LibTypes.Side.LONG), price);
         return opened;
     }
 
+    /**
+     * @dev Liqudate a bankrupt margin account (cash balance cannot cover negative pnl), force to sell its postion
+     *      at mark price to the liquidator. The liquidated margin account will suffer a penalty.
+     *      The liquidating process must be initiated from a margin account with enough margin balance.
+     *      Any loss caused by liquidated account is firstly be recovered by insurance fund, then uncovered part
+     *      will become socialloss and applied to the side of its couterparty.
+     *
+     * @param liquidator        Address who initiate liquidation.
+     * @param trader            Address who is liqudated.
+     * @param liquidationPrice  Price to liquidate.
+     * @param liquidationAmount Max amount to liquidate.
+     * @return Opened position amount for liquidator.
+     */
     function liquidate(address liquidator, address trader, uint256 liquidationPrice, uint256 liquidationAmount)
         internal
         returns (uint256)
     {
         // liquidiated trader
         LibTypes.MarginAccount memory account = marginAccounts[trader];
+        require(liquidationAmount <= account.size, "exceeded liquidation amount");
+
         LibTypes.Side liquidationSide = account.side;
         uint256 liquidationValue = liquidationPrice.wmul(liquidationAmount);
         int256 penaltyToLiquidator = governance.liquidationPenaltyRate.wmul(liquidationValue).toInt256();
         int256 penaltyToFund = governance.penaltyFundRate.wmul(liquidationValue).toInt256();
-        int256 rpnl = close(account, liquidationPrice, liquidationAmount);
-        marginAccounts[trader] = account;
-        emit UpdatePositionAccount(trader, account, totalSize(LibTypes.Side.LONG), liquidationPrice);
 
-        rpnl = rpnl.sub(penaltyToLiquidator).sub(penaltyToFund);
-        updateBalance(trader, rpnl);
-        int256 liquidationLoss = ensurePositiveBalance(trader).toInt256();
-
-        // liquidator, penalty + poisition
-        updateBalance(liquidator, penaltyToLiquidator);
+        // position: trader => liquidator
+        trade(trader, liquidationSide.counterSide(), liquidationPrice, liquidationAmount);
         uint256 opened = trade(liquidator, liquidationSide, liquidationPrice, liquidationAmount);
 
-        // fund, fund penalty - possible social loss
+        // penalty: trader => liquidator, trader => insuranceFundBalance
+        marginAccounts[trader].cashBalance = marginAccounts[trader].cashBalance
+            .sub(penaltyToLiquidator).sub(penaltyToFund);
+        marginAccounts[liquidator].cashBalance = marginAccounts[liquidator].cashBalance
+            .add(penaltyToLiquidator);
         insuranceFundBalance = insuranceFundBalance.add(penaltyToFund);
+
+        // loss
+        int256 liquidationLoss = ensurePositiveBalance(trader).toInt256();
+        // fund, fund penalty - possible social loss
         if (insuranceFundBalance >= liquidationLoss) {
+            // insurance covers the loss
             insuranceFundBalance = insuranceFundBalance.sub(liquidationLoss);
         } else {
+            // insurance cannot covers the loss, overflow part become socialloss of counter side.
             int256 newSocialLoss = liquidationLoss.sub(insuranceFundBalance);
             insuranceFundBalance = 0;
             handleSocialLoss(liquidationSide.counterSide(), newSocialLoss);
@@ -348,4 +359,21 @@ contract MarginAccount is Collateral {
         return opened;
     }
 
+    /**
+     * @dev Increase social loss per contract on given side.
+     *
+     * @param side Side of position.
+     * @param loss Amount of loss to handle.
+     */
+    function handleSocialLoss(LibTypes.Side side, int256 loss) internal {
+        require(side != LibTypes.Side.FLAT, "side can't be flat");
+        require(totalSize(side) > 0, "size cannot be 0");
+        require(loss >= 0, "loss must be positive");
+
+        int256 newSocialLoss = loss.wdiv(totalSize(side).toInt256());
+        int256 newLossPerContract = socialLossPerContracts[uint256(side)].add(newSocialLoss);
+        socialLossPerContracts[uint256(side)] = newLossPerContract;
+
+        emit SocialLoss(side, newLossPerContract);
+    }
 }
