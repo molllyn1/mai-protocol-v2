@@ -22,7 +22,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     event CreateAccount(uint256 indexed id, address indexed trader);
     event Trade(address indexed taker, address indexed maker, LibTypes.Side side, uint256 price, uint256 amount);
     event Liquidate(address indexed keeper, address indexed trader, uint256 price, uint256 amount);
-    event EndGlobalSettlement();
+    event UpdateSettlementPrice(uint256 price);
 
     constructor(address _globalConfig, address _devAddress, address _collateral, uint256 _collateralDecimals)
         public
@@ -47,14 +47,26 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         emit InternalUpdateBalance(trader, deltaAmount, amount);
     }
 
-    function endGlobalSettlement() public onlyWhitelistAdmin {
-        require(status == LibTypes.Status.SETTLING, "wrong perpetual status");
+    /**
+     * @dev Set perpetual status to 'emergency'. It can be called multiple times to set price.
+     *      In emergency mode, main function like trading / withdrawing is disabled to prevent unexpected loss.
+     *
+     * @param price Price used as mark price in emergency mode.
+     */
+    function beginGlobalSettlement(uint256 price) public onlyWhitelistAdmin {
+        setEmergencyStatus();
+        settlementPrice = price;
+        emit UpdateSettlementPrice(price);
+    }
 
+    /**
+     * @dev Set perpetual status to 'settled'. It can be call only once in 'emergency' mode.
+     *      In settled mode, user is expected to closed positions and withdraw all the collateral.
+     */
+    function endGlobalSettlement() public onlyWhitelistAdmin {
+        setSettledStatus();
         address ammTrader = address(amm.perpetualProxy());
         settleImplementation(ammTrader);
-        status = LibTypes.Status.SETTLED;
-
-        emit EndGlobalSettlement();
     }
 
     function depositToInsuranceFund(uint256 rawAmount) public payable nonReentrant {
@@ -83,10 +95,6 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     // End Admin functions
 
     // Deposit && Withdraw
-    function setBroker(address newBroker) public {
-        setBrokerImplementation(msg.sender, newBroker);
-    }
-
     function deposit(uint256 rawAmount) public payable nonReentrant {
         depositImplementation(msg.sender, rawAmount);
     }
@@ -113,10 +121,6 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     // Deposit && Withdraw - Whitelisted Only
-    function setBrokerFor(address trader, address newBroker) public onlyWhitelisted nonReentrant {
-        setBrokerImplementation(trader, newBroker);
-    }
-
     function depositFor(address trader, uint256 rawAmount) public payable onlyWhitelisted nonReentrant {
         depositImplementation(trader, rawAmount);
     }
@@ -125,17 +129,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         withdrawImplementation(trader, rawAmount);
     }
 
-    // this is a composite function of perp.deposit + perp.setBroker
-    // composite functions accept amount = 0
-    function depositAndSetBroker(uint256 rawAmount, address broker) external payable {
-        setBroker(broker);
-        if (rawAmount > 0) {
-            deposit(rawAmount);
-        }
-    }
-
     // Method for public properties
-
     function markPrice() public ammRequired returns (uint256) {
         return status == LibTypes.Status.NORMAL ? amm.currentMarkPrice() : settlementPrice;
     }
@@ -317,18 +311,5 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
             // updateBalance(trader, rpnl);
         }
         emit UpdatePositionAccount(trader, account, totalSize(LibTypes.Side.LONG), currentMarkPrice);
-    }
-
-    /**
-     * @dev Implementation as underlaying of setBroker and setBrokerFor.
-     *
-     * @param trader    Address the collateral will be transferred to.
-     * @param newBroker Address of new broker.
-     */
-    function setBrokerImplementation(address trader, address newBroker) internal {
-        if (currentBroker(trader) != newBroker) {
-            brokers[trader].setValueDelayed(newBroker.toBytes32(), globalConfig.brokerLockBlockCount());
-            emit BrokerUpdate(trader, newBroker, brokers[trader].blockHeight);
-        }
     }
 }

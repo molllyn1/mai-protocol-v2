@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2; // to enable structure-type parameter
 library LibTypes {
     enum Side {FLAT, SHORT, LONG}
 
-    enum Status {NORMAL, SETTLING, SETTLED}
+    enum Status {NORMAL, EMERGENCY, SETTLED}
 
     function counterSide(Side side) internal pure returns (Side) {
         if (side == Side.LONG) {

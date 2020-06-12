@@ -9,7 +9,9 @@ import "./PerpetualStorage.sol";
 
 contract PerpetualGovernance is PerpetualStorage {
 
-    event BeginGlobalSettlement(uint256 price);
+    event EnterEmergencyStatus();
+    event EnterSettledStatus();
+
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
     event UpdateGovernanceAddress(bytes32 indexed key, address value);
 
@@ -88,10 +90,15 @@ contract PerpetualGovernance is PerpetualStorage {
         emit UpdateGovernanceAddress(key, value);
     }
 
-    function beginGlobalSettlement(uint256 price) public onlyWhitelistAdmin {
-        require(status != LibTypes.Status.SETTLED, "already settled");
-        settlementPrice = price;
-        status = LibTypes.Status.SETTLING;
-        emit BeginGlobalSettlement(price);
+    function setEmergencyStatus() internal {
+        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
+        status = LibTypes.Status.EMERGENCY;
+        emit EnterEmergencyStatus();
+    }
+
+    function setSettledStatus() internal {
+        require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
+        status = LibTypes.Status.SETTLED;
+        event EnterSettledStatus();
     }
 }

@@ -18,8 +18,6 @@ contract Exchange {
 
     uint256 public constant SUPPORTED_ORDER_VERSION = 2;
 
-    enum OrderStatus {EXPIRED, CANCELLED, FILLABLE, FULLY_FILLED}
-
     mapping(bytes32 => uint256) public filled;
     mapping(bytes32 => bool) public cancelled;
 
@@ -179,13 +177,11 @@ contract Exchange {
         view
         returns (bytes32)
     {
-        address broker = perpetual.currentBroker(orderParam.trader);
-        require(broker == msg.sender, "invalid broker");
         require(orderParam.orderVersion() == SUPPORTED_ORDER_VERSION, "unsupported version");
         require(orderParam.expiredAt() >= block.timestamp, "order expired");
         require(orderParam.chainId() == getChainId(), "unmatched chainid");
 
-        bytes32 orderHash = orderParam.getOrderHash(address(perpetual), broker);
+        bytes32 orderHash = orderParam.getOrderHash(address(perpetual), msg.sender);
         require(!cancelled[orderHash], "cancelled order");
         require(orderParam.signature.isValidSignature(orderHash, orderParam.trader), "invalid signature");
         require(filled[orderHash] < orderParam.amount, "fullfilled order");
@@ -206,7 +202,7 @@ contract Exchange {
     }
 
     function cancelOrder(LibOrder.Order memory order) public {
-        require(msg.sender == order.trader || msg.sender == order.broker, "invalid caller");
+        require(msg.sender == order.broker, "invalid caller");
 
         bytes32 orderHash = order.getOrderHash();
         cancelled[orderHash] = true;
