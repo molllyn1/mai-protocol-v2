@@ -3,7 +3,7 @@
     "test": "truffle test",
     "compile": "truffle compile",
     "migrate": "truffle migrate",
-    "coverage": "node --max_old_space_size=65536 ./node_modules/.bin/truffle run coverage"
+    "coverage": "truffle run coverage"
   },
   "dependencies": {
     "@openzeppelin/contracts": "2.5.0",
@@ -11,7 +11,8 @@
     "byzantine": "^1.1.0",
     "coveralls": "^3.0.6",
     "ethereumjs-util": "^5.2.0",
-    "solidity-coverage": "^0.7.2",
+    "ganache-cli": "^6.9.1",
+    "solidity-coverage": "^0.7.7",
     "truffle": "5.0.22",
     "truffle-hdwallet-provider": "^1.0.17",
     "truffle-privatekey-provider": "^1.2.0",

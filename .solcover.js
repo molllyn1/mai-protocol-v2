@@ -11,7 +11,9 @@ module.exports = {
     copyPackages: [
         '@openzeppelin/contracts'
     ],
+    client: require('ganache-cli'),
     providerOptions: {
+        "hardfork": "istanbul",
         accounts: [
             {
                 secretKey: "0xc013164ef5035ba72923016114696ef61c240b1764c8649108941cb3866587d3",
