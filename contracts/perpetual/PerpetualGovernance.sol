@@ -89,22 +89,35 @@ contract PerpetualGovernance is PerpetualStorage {
         emit UpdateGovernanceAddress(key, value);
     }
 
-    function setEmergencyStatus() internal {
-        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
-        status = LibTypes.Status.EMERGENCY;
-        emit EnterEmergencyStatus();
-    }
-
+    /**
+     * @dev Set status to EMERGENCY.
+     */
     function setSettledStatus() internal {
         require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
         status = LibTypes.Status.SETTLED;
         emit EnterSettledStatus();
     }
 
+    /**
+     * @dev Set status to SETTLED.
+     */
+    function setEmergencyStatus() internal {
+        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
+        status = LibTypes.Status.EMERGENCY;
+        emit EnterEmergencyStatus();
+    }
+
+    /** 
+     * @dev Check amount with lot size. Amount must be integral multiple of lot size.
+     */
     function isValidLotSize(uint256 amount) public view returns (bool) {
         return amount > 0 && amount.mod(governance.lotSize) == 0;
     }
 
+    /**
+     * @dev Check amount with trading lot size. Amount must be integral multiple of trading lot size.
+     *      This is useful in trading to control minimal trading position size.
+     */
     function isValidTradingLotSize(uint256 amount) public view returns (bool) {
         return amount > 0 && amount.mod(governance.tradingLotSize) == 0;
     }

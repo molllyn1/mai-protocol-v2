@@ -62,7 +62,7 @@ contract('order', accounts => {
 
         console.log("----")
         console.log(orderParam.data);
-        console.log("++++", await testOrder.chainId(orderParam, {}));
+        console.log("++++", await testOrder.chainId(orderParam));
         console.log("----")
 
 
