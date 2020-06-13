@@ -7,8 +7,8 @@ import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 import "./PerpetualStorage.sol";
 
-contract PerpetualGovernance is PerpetualStorage {
 
+contract PerpetualGovernance is PerpetualStorage {
     event EnterEmergencyStatus();
     event EnterSettledStatus();
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
@@ -21,11 +21,11 @@ contract PerpetualGovernance is PerpetualStorage {
     }
 
     /**
-      * @dev Set governance parameters.
-      *
-      * @param key   Name of parameter.
-      * @param value Value of parameter.
-      */
+     * @dev Set governance parameters.
+     *
+     * @param key   Name of parameter.
+     * @param value Value of parameter.
+     */
     function setGovernanceParameter(bytes32 key, int256 value) public onlyWhitelistAdmin {
         if (key == "initialMarginRate") {
             governance.initialMarginRate = value.toUint256();
@@ -70,11 +70,11 @@ contract PerpetualGovernance is PerpetualStorage {
     }
 
     /**
-      * @dev Set governance address. like set governance parameter.
-      *
-      * @param key   Name of parameter.
-      * @param value Address to set.
-      */
+     * @dev Set governance address. like set governance parameter.
+     *
+     * @param key   Name of parameter.
+     * @param value Address to set.
+     */
     function setGovernanceAddress(bytes32 key, address value) public onlyWhitelistAdmin {
         require(value != address(0), "invalid address");
         if (key == "dev") {
@@ -101,11 +101,11 @@ contract PerpetualGovernance is PerpetualStorage {
         emit EnterSettledStatus();
     }
 
-    function isValidLotSize(uint256 amount) internal view returns (bool) {
+    function isValidLotSize(uint256 amount) public view returns (bool) {
         return amount > 0 && amount.mod(governance.lotSize) == 0;
     }
 
-    function isValidTradingLotSize(uint256 amount) internal view returns (bool) {
+    function isValidTradingLotSize(uint256 amount) public view returns (bool) {
         return amount > 0 && amount.mod(governance.tradingLotSize) == 0;
     }
 }

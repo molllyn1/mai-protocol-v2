@@ -8,7 +8,7 @@ const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ContractReader = artifacts.require('reader/ContractReader.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
@@ -70,11 +70,6 @@ contract('contractReader', accounts => {
         await amm.setBlockTimestamp(index.timestamp);
     };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
-    };
-
     const useDefaultGovParameters = async () => {
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
@@ -100,7 +95,6 @@ contract('contractReader', accounts => {
 
         await deploy();
         await setIndexPrice(7000);
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
 
@@ -117,8 +111,6 @@ contract('contractReader', accounts => {
 
     it('getGovParams', async () => {
         const p = await contractReader.getGovParams(perpetual.address);
-        assert.equal(parseInt(p.withdrawalLockBlockCount), 5);
-        assert.equal(parseInt(p.brokerLockBlockCount), 5);
 
         assert.equal(fromWad(p.perpGovernanceConfig.initialMarginRate), 0.1);
         assert.equal(fromWad(p.perpGovernanceConfig.maintenanceMarginRate), 0.05);
@@ -157,18 +149,11 @@ contract('contractReader', accounts => {
 
     it('getAccountStorage', async () => {
         const p = await contractReader.getAccountStorage(perpetual.address, u1);
-        assert.equal(fromWad(p.collateral.balance), 70000);
-        assert.equal(fromWad(p.collateral.appliedBalance), 0);
-        assert.equal(parseInt(p.collateral.appliedHeight), 0);
-        assert.equal(parseInt(p.position.side), 1);
-        assert.equal(fromWad(p.position.size), 100);
-        assert.equal(fromWad(p.position.entryValue), 700000);
-        assert.equal(fromWad(p.position.entrySocialLoss), 0);
-        assert.equal(fromWad(p.position.entryFundingLoss), 0);
-        assert.equal(p.broker.current.broker, '0x0000000000000000000000000000000000000000');
-
-        await perpetual.setBroker(u3, { from: u1 });
-        const p2 = await contractReader.getAccountStorage(perpetual.address, u1);
-        assert.equal(p2.broker.current.broker, u3);
+        assert.equal(fromWad(p.margin.cashBalance), 70000);
+        assert.equal(parseInt(p.margin.side), 1);
+        assert.equal(fromWad(p.margin.size), 100);
+        assert.equal(fromWad(p.margin.entryValue), 700000);
+        assert.equal(fromWad(p.margin.entrySocialLoss), 0);
+        assert.equal(fromWad(p.margin.entryFundingLoss), 0);
     });
 });

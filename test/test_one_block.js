@@ -9,7 +9,7 @@ const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const AMM = artifacts.require('perpetual/AMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
 const gasLimit = 8000000;
@@ -67,11 +67,6 @@ contract('one block', accounts => {
         await perpetual.addWhitelisted(proxy.address);
     };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
-    };
-
     const useDefaultGovParameters = async () => {
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
@@ -92,42 +87,31 @@ contract('one block', accounts => {
         await amm.setGovernanceParameter(toBytes32('fundingDampener'), toWad(0.0005));
     };
 
-    const setBroker = async (user, broker) => {
-        await perpetual.setBroker(broker, { from: user });
-        for (let i = 0; i < 4; i++) {
-            await increaseEvmBlock();
-        }
-    };
-
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
 
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
 
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
     
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
 
     beforeEach(async () => {
         snapshotId = await createEVMSnapshot();
         await deploy();
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
-        await setBroker(u1, proxy.address);
-        await setBroker(u2, proxy.address);
-
     });
 
     afterEach(async function () {

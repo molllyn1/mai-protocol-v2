@@ -332,7 +332,20 @@ contract('TestPerpetual', accounts => {
                 await perpetual.liquidate(u1, toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid lot size"));
+                assert.ok(error.message.includes("invalid lot size"), error);
+            }
+        })
+
+        it('partial liquidate - self liquidate', async () => {
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
+            await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
+            await perpetual.setGovernanceParameter(toBytes32("lotSize"), toWad(10));
+
+            try {
+                await perpetual.liquidate(u1, toWad(10), { from: u1 });
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("self liquidate"), error);
             }
         })
 
@@ -347,7 +360,7 @@ contract('TestPerpetual', accounts => {
                 await perpetual.liquidate(u1, toWad(0), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("nothing to liquidate"));
+                assert.ok(error.message.includes("invalid lot size"));
             }
         })
 

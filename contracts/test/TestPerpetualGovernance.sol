@@ -8,4 +8,14 @@ contract TestPerpGovernance is PerpetualGovernance {
     function testAmmRequired() public view ammRequired returns (uint256) {
         return 1;
     }
+
+    function setEmergencyStatusPublic() public {
+        setEmergencyStatus();
+    }
+
+    function setSettledStatusPublic() public {
+        setSettledStatus();
+    }
 }
+
+

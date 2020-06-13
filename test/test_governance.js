@@ -9,7 +9,7 @@ const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 
 contract('TestPerpGovernance', accounts => {
     const NORMAL = 0;
-    const SETTLING = 1;
+    const EMERGENCY = 1;
     const SETTLED = 2;
 
     let governance;
@@ -36,7 +36,6 @@ contract('TestPerpGovernance', accounts => {
         ammGovernance = await AMMGovernance.new();
         globalConfig = await GlobalConfig.new();
 
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
     };
@@ -186,14 +185,11 @@ contract('TestPerpGovernance', accounts => {
             assert.equal(addr, "0x0000000000000000000000000000000000000000");
 
             let config = await GlobalConfig.new();
-            await config.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 1);
-
             await governance.setGovernanceAddress(toBytes32("globalConfig"), config.address);
             addr = await governance.globalConfig();
             assert.equal(addr, config.address);
 
             config = await GlobalConfig.at(addr);
-            assert.equal(await config.withdrawalLockBlockCount(), 1);
         });
 
         it('set funding', async () => {
@@ -315,7 +311,7 @@ contract('TestPerpGovernance', accounts => {
 
     const isEmergency = async () => {
         const status = await governance.status();
-        return status == SETTLING
+        return status == EMERGENCY
     }
 
     const isGlobalSettled = async () => {
@@ -327,41 +323,38 @@ contract('TestPerpGovernance', accounts => {
     describe("status", async () => {
         beforeEach(deploy);
 
-        it("beginGlobalSettlement", async () => {
+        it("setEmergencyStatusPublic", async () => {
             assert.equal(await governance.status(), NORMAL);
-            await governance.beginGlobalSettlement(toWad(7000));
-            assert.equal(await governance.status(), SETTLING);
+            await governance.setEmergencyStatusPublic();
+            assert.equal(await governance.status(), EMERGENCY);
             assert.equal(await isEmergency(), true);
             assert.equal(await isGlobalSettled(), false);
-            assert.equal(await governance.settlementPrice(), toWad(7000));
         });
 
-        it("beginGlobalSettlement again", async () => {
+        it("setEmergencyStatusPublic again", async () => {
             assert.equal(await governance.status(), NORMAL);
-            await governance.beginGlobalSettlement(toWad(7000));
-            assert.equal(await governance.status(), SETTLING);
+            await governance.setEmergencyStatusPublic();
+            assert.equal(await governance.status(), EMERGENCY);
             assert.equal(await isEmergency(), true);
             assert.equal(await isGlobalSettled(), false);
-            assert.equal(await governance.settlementPrice(), toWad(7000));
 
-            await governance.beginGlobalSettlement(toWad(7200));
-            assert.equal(await governance.status(), SETTLING);
+            await governance.setEmergencyStatusPublic();
+            assert.equal(await governance.status(), EMERGENCY);
             assert.equal(await isEmergency(), true);
             assert.equal(await isGlobalSettled(), false);
-            assert.equal(await governance.settlementPrice(), toWad(7200));
         });
 
-        it("not owner", async () => {
+        it("setSettledStatusPublic", async () => {
             assert.equal(await governance.status(), NORMAL);
-            try {
-                await governance.beginGlobalSettlement(toWad(7000), { from: u1 });
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("WhitelistAdmin role"), error);
-            }
+            await governance.setEmergencyStatusPublic();
+            assert.equal(await governance.status(), EMERGENCY);
+            assert.equal(await isEmergency(), true);
+            assert.equal(await isGlobalSettled(), false);
 
-            await governance.beginGlobalSettlement(toWad(7000));
-            assert.equal(await governance.status(), SETTLING);
+            await governance.setSettledStatusPublic();
+            assert.equal(await governance.status(), SETTLED);
+            assert.equal(await isEmergency(), false);
+            assert.equal(await isGlobalSettled(), true);
         });
     });
 });

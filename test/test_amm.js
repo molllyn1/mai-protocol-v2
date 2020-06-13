@@ -81,11 +81,6 @@ contract('amm', accounts => {
         await perpetual.addWhitelisted(proxy.address);
     };
 
-    const useDefaultGlobalConfig = async () => {
-        await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
-    };
-
     const useDefaultGovParameters = async () => {
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
@@ -112,15 +107,6 @@ contract('amm', accounts => {
         // priceFeeder will modify index.timestamp, amm.timestamp should >= index.timestamp
         const index = await amm.indexPrice();
         await amm.setBlockTimestamp(index.timestamp);
-    };
-
-    const setBroker = async (user, broker) => {
-        await perpetual.setBroker(broker, {
-            from: user
-        });
-        for (let i = 0; i < 4; i++) {
-            await increaseEvmBlock();
-        }
     };
 
     const positionSize = async (user) => {
@@ -150,13 +136,11 @@ contract('amm', accounts => {
     beforeEach(async () => {
         snapshotId = await createEVMSnapshot();
         await deploy();
-        await useDefaultGlobalConfig();
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
-        await setBroker(u1, proxy.address);
     });
 
-    afterEach(async function() {
+    afterEach(async function () {
         await restoreEVMSnapshot(snapshotId);
     });
 
@@ -172,20 +156,8 @@ contract('amm', accounts => {
             }
         });
 
-        it("invalid broker", async () => {
-            await priceFeeder.setPrice(toWad(6000));
-            try {
-                await amm.buy(toWad(1), toWad(10000), infinity);
-                throw null;
-            } catch (error) {
-                assert.ok(error.message.includes("invalid broker"));
-            }
-        });
-
         it("empty pool", async () => {
             await priceFeeder.setPrice(toWad(6000));
-            await perpetual.setBroker(proxy.address, { from: admin });
-            await increaseBlockBy(5);
             try {
                 await amm.buy(toWad(1), toWad(10000), infinity);
                 throw null;
@@ -208,11 +180,10 @@ contract('amm', accounts => {
             // approve
             await collateral.transfer(u2, toWad(7000 * 3));
             await collateral.approve(perpetual.address, infinity, { from: u2 });
-            await setBroker(u2, proxy.address);
             await increaseBlockBy(4);
 
             await perpetual.deposit(toWad(7000 * 3), { from: u2 });
-             try {
+            try {
                 await amm.addLiquidity(toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
@@ -228,11 +199,10 @@ contract('amm', accounts => {
             // approve
             await collateral.transfer(u2, toWad(7000 * 3));
             await collateral.approve(perpetual.address, infinity, { from: u2 });
-            await setBroker(u2, proxy.address);
             await increaseBlockBy(4);
 
             await perpetual.deposit(toWad(7000 * 3), { from: u2 });
-             try {
+            try {
                 await amm.removeLiquidity(toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
@@ -259,8 +229,6 @@ contract('amm', accounts => {
             // approve
             await collateral.transfer(u2, toWad(7000 * 3));
             await collateral.approve(perpetual.address, infinity, { from: u2 });
-            await setBroker(u2, proxy.address);
-            await increaseBlockBy(4);
         })
 
         it("depositAndBuy", async () => {
@@ -440,8 +408,6 @@ contract('amm', accounts => {
             await collateral.approve(perpetual.address, infinity, {
                 from: dev
             });
-            await setBroker(u2, proxy.address);
-            await setBroker(u3, proxy.address);
             await increaseBlockBy(4);
 
             // create amm
@@ -623,7 +589,7 @@ contract('amm', accounts => {
             assert.equal(fromWad(await perpetual.pnl.call(u2)), '0');
         });
 
-     it("buyAndWithdraw - success", async () => {
+        it("buyAndWithdraw - success", async () => {
             await perpetual.deposit(toWad(7000 * 2), { from: u2 });
             await amm.buyAndWithdraw(toWad(0), toWad('10000'), infinity, toWad(7000 * 2), { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), '0'); // -7777.777777777777777777
@@ -898,7 +864,7 @@ contract('amm', accounts => {
         });
 
         it("depositAndAddLiquidity - success", async () => {
-            await amm.depositAndAddLiquidity(toWad(7000 * 3), toWad(1), { from: u2});
+            await amm.depositAndAddLiquidity(toWad(7000 * 3), toWad(1), { from: u2 });
 
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000);
             assert.equal(fromWad(await share.balanceOf(u2)), 1);
@@ -961,7 +927,6 @@ contract('amm', accounts => {
             await collateral.approve(perpetual.address, infinity, {
                 from: u2
             });
-            await setBroker(u2, proxy.address);
 
             // create amm
             await perpetual.deposit(toWad(7000 * 100 * 2.1), {
@@ -1121,17 +1086,11 @@ contract('amm', accounts => {
         });
 
         it("depositAndBuy, deposit = $0 - success", async () => {
-            await perpetual.deposit(toWad(7000 * 1), {
-                from: u2
-            });
+            await perpetual.deposit(toWad(7000 * 1), { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000 * 1);
             assert.equal(fromWad(await positionSize(u2)), 0);
-            assert.equal(await perpetual.currentBroker.call(u2), '0x0000000000000000000000000000000000000000');
 
-            await amm.depositAndBuy('0', toWad(1), toWad('10000'), infinity, {
-                from: u2
-            });
-            assert.equal(await perpetual.currentBroker.call(u2), proxy.address);
+            await amm.depositAndBuy('0', toWad(1), toWad('10000'), infinity, { from: u2 });
             assert.equal(fromWad(await cashBalanceOf(u2)), '6883.333333333333333333');
             assert.equal(fromWad(await positionSize(u2)), 1);
         });

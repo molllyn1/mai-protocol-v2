@@ -67,7 +67,7 @@ contract('order', accounts => {
 
 
         assert.equal(getOrderHash(offline), orderHash);
-        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, {from:admin}), 1589366656);
+        assert.equal(await testOrder.expiredAt.call(orderParam, {from:admin}), 1589366656);
         assert.equal(await testOrder.isSell.call(orderParam, {from:admin}), false);
         assert.equal(await testOrder.getPrice.call(orderParam, {from:admin}), toWad(6000));
         assert.equal(await testOrder.isMarketOrder.call(orderParam, {from:admin}), true);
@@ -106,7 +106,7 @@ contract('order', accounts => {
         const orderHash = await testOrder.getOrderHash(await testOrder.getOrder(orderParam, perpetualAddress, admin));
 
         assert.equal(getOrderHash(offline), orderHash);
-        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, {from:admin}), 1589366657);
+        assert.equal(await testOrder.expiredAt.call(orderParam, {from:admin}), 1589366657);
         assert.equal(await testOrder.isSell.call(orderParam, {from:admin}), true);
         assert.equal(await testOrder.getPrice.call(orderParam, {from:admin}), toWad(6000));
         assert.equal(await testOrder.isMarketOrder.call(orderParam, {from:admin}), false);
@@ -146,7 +146,7 @@ contract('order', accounts => {
         const orderHash = await testOrder.getOrderHash(await testOrder.getOrder(orderParam, perpetualAddress, admin));
 
         assert.equal(getOrderHash(offline), orderHash);
-        assert.equal(await testOrder.getOrderExpiredAt.call(orderParam, {from:admin}), 1589366657);
+        assert.equal(await testOrder.expiredAt.call(orderParam, {from:admin}), 1589366657);
         assert.equal(await testOrder.isSell.call(orderParam, {from:admin}), false);
         assert.equal((await testOrder.getPrice.call(orderParam, {from:admin})).toString(), "166666666666667");
         assert.equal(await testOrder.isMarketOrder.call(orderParam, {from:admin}), true);

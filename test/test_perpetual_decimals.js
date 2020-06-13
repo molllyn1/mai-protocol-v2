@@ -46,8 +46,6 @@ contract('TestPerpetual', accounts => {
     };
 
     const setDefaultGovParameters = async () => {
-        await global.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-        await global.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
         await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
         await perpetual.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.005));
@@ -79,33 +77,30 @@ contract('TestPerpetual', accounts => {
     };
 
     const positionSize = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.size;
     }
     const positionSide = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.side;
     }
     const positionEntryValue = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryValue;
     }
     const positionEntrySocialLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entrySocialLoss;
     }
     const positionEntryFundingLoss = async (user) => {
-        const positionAccount = await perpetual.getPosition(user);
+        const positionAccount = await perpetual.getMarginAccount(user);
         return positionAccount.entryFundingLoss;
     }
     const cashBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.balance;
+        const cashAccount = await perpetual.getMarginAccount(user);
+        return cashAccount.cashBalance;
     }
-    const appliedBalanceOf = async (user) => {
-        const cashAccount = await perpetual.getCashBalance(user);
-        return cashAccount.appliedBalance;
-    }
+    
     const isPositionBalanced = async () => {
         const long = (await perpetual.totalSize(LONG)).toString();
         const short = (await perpetual.totalSize(SHORT)).toString();

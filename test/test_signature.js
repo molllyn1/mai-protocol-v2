@@ -194,7 +194,7 @@ contract('signature', accounts => {
             expiredAt: 1589366656,
             salt: 666,
         }, perpetualAddress, admin);
-        const ts = await testOrder.getOrderExpiredAt.call({
+        const ts = await testOrder.expiredAt.call({
             trader: orderA.trader,
             amount: orderA.amount,
             price: orderA.price,

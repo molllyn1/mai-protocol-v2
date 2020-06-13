@@ -9,7 +9,7 @@ import "../lib/LibMath.sol";
 
 import "./MarginAccount.sol";
 
-contract Perpetual is MarginAccount, ReentrancyGuard  {
+contract Perpetual is MarginAccount, ReentrancyGuard {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
     using LibOrder for LibTypes.Side;
@@ -24,10 +24,12 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     event Liquidate(address indexed keeper, address indexed trader, uint256 price, uint256 amount);
     event UpdateSettlementPrice(uint256 price);
 
-    constructor(address _globalConfig, address _devAddress, address _collateral, uint256 _collateralDecimals)
-        public
-        MarginAccount(_collateral, _collateralDecimals)
-    {
+    constructor(
+        address _globalConfig,
+        address _devAddress,
+        address _collateral,
+        uint256 _collateralDecimals
+    ) public MarginAccount(_collateral, _collateralDecimals) {
         setGovernanceAddress("globalConfig", _globalConfig);
         setGovernanceAddress("dev", _devAddress);
 
@@ -40,6 +42,13 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     // Admin functions
+    /**
+     * @notice Force to set cash balance of margin account. Called by administrator to
+     *      fix unexpected cash balance.
+     *
+     * @param trader Address of account owner.
+     * @param amount Absolute cash balance value to be set.
+     */
     function setCashBalance(address trader, int256 amount) public onlyWhitelistAdmin {
         require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
         int256 deltaAmount = amount.sub(marginAccounts[trader].cashBalance);
@@ -48,7 +57,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     /**
-     * @dev Set perpetual status to 'emergency'. It can be called multiple times to set price.
+     * @notice Set perpetual status to 'emergency'. It can be called multiple times to set price.
      *      In emergency mode, main function like trading / withdrawing is disabled to prevent unexpected loss.
      *
      * @param price Price used as mark price in emergency mode.
@@ -60,8 +69,9 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     /**
-     * @dev Set perpetual status to 'settled'. It can be call only once in 'emergency' mode.
-     *      In settled mode, user is expected to closed positions and withdraw all the collateral.
+     * @notice Set perpetual status to 'settled'. It can be call only once in 'emergency' mode.
+     *         In settled mode, user is expected to closed positions and withdraw all the collateral.
+     * @notice endGlobalSettlement will also settle all postition belongs to amm.
      */
     function endGlobalSettlement() public onlyWhitelistAdmin {
         setSettledStatus();
@@ -69,6 +79,12 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         settleImplementation(ammTrader);
     }
 
+    /**
+     * @notice Deposit collateral to insurance fund to recover social loss. Note that depositing to
+     *         insurance fund *DOES NOT* profit to depositor and only administrator can withdraw from the fund.
+     *
+     * @param rawAmount Amount to deposit.
+     */
     function depositToInsuranceFund(uint256 rawAmount) public payable nonReentrant {
         checkDepositingParameter(rawAmount);
 
@@ -80,6 +96,11 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         emit UpdateInsuranceFund(insuranceFundBalance);
     }
 
+    /**
+     * @notice Withdraw collateral from insurance fund. Only administrator can withdraw from it.
+     *
+     * @param rawAmount Amount to withdraw.
+     */
     function withdrawFromInsuranceFund(uint256 rawAmount) public onlyWhitelistAdmin nonReentrant {
         require(rawAmount > 0, "invalid amount");
         require(insuranceFundBalance > 0, "insufficient funds");
@@ -92,20 +113,36 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
 
         emit UpdateInsuranceFund(insuranceFundBalance);
     }
+
     // End Admin functions
 
     // Deposit && Withdraw
+    /**
+     * @notice Deposit collateral to sender's margin account.
+     *         When depositing ether rawAmount must strictly equal to
+     *
+     * @dev    Need approval
+     *
+     * @param rawAmount Amount to deposit.
+     */
     function deposit(uint256 rawAmount) public payable nonReentrant {
         depositImplementation(msg.sender, rawAmount);
     }
 
+    /**
+     * @notice Withdraw collateral from sender's margin account. only available in normal state.
+     *
+     * @param rawAmount Amount to withdraw.
+     */
     function withdraw(uint256 rawAmount) public nonReentrant {
         withdrawImplementation(msg.sender, rawAmount);
     }
 
+    /**
+     * @notice Close all position and withdraw all collateral remaining in sender's margin account.
+     *         Settle is only available in settled state and can be called multiple times.
+     */
     function settle() public nonReentrant {
-        require(status == LibTypes.Status.SETTLED, "wrong perpetual status");
-
         address payable trader = msg.sender;
         settleImplementation(trader);
         int256 wadAmount = marginAccounts[trader].cashBalance;
@@ -117,71 +154,172 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     // Deposit && Withdraw - Whitelisted Only
+    /**
+     * @notice Deposit collateral for trader into the trader's margin account. The collateral will be transfer
+     *         from the trader's ethereum address.
+     *         depositFor is only available to administrator.
+     *
+     * @dev    Need approval
+     *
+     * @param trader    Address of margin account to deposit into.
+     * @param rawAmount Amount of collateral to deposit.
+     */
     function depositFor(address trader, uint256 rawAmount) public payable onlyWhitelisted nonReentrant {
         depositImplementation(trader, rawAmount);
     }
 
+    /**
+     * @notice Withdraw collateral for trader from the trader's margin account. The collateral will be transfer
+     *         to the trader's ethereum address.
+     *         withdrawFor is only available to administrator.
+     *
+     * @param trader    Address of margin account to deposit into.
+     * @param rawAmount Amount of collateral to deposit.
+     */
     function withdrawFor(address payable trader, uint256 rawAmount) public onlyWhitelisted nonReentrant {
         withdrawImplementation(trader, rawAmount);
     }
 
     // Method for public properties
+    /**
+     * @notice Price to calculate all price-depended properties of margin account.
+     *         The price is read from amm in normal status, and will replaced by settlement price
+     *         in emergency and settled status.
+     *
+     * @dev decimals == 18
+     *
+     * @return Mark price.
+     */
     function markPrice() public ammRequired returns (uint256) {
         return status == LibTypes.Status.NORMAL ? amm.currentMarkPrice() : settlementPrice;
     }
 
+    /**
+     * @notice (initial) Margin value of margin account according to mark price.
+     *                   See marginWithPrice in MarginAccount.sol.
+     *
+     * @param trader Address of account owner.
+     * @return Initial margin of margin account.
+     */
     function positionMargin(address trader) public returns (uint256) {
         return MarginAccount.marginWithPrice(trader, markPrice());
     }
 
+    /**
+     * @notice (maintenance) Margin value of margin account according to mark price.
+     *         See maintenanceMarginWithPrice in MarginAccount.sol.
+     *
+     * @param trader Address of account owner.
+     * @return Maintanence margin of margin account.
+     */
     function maintenanceMargin(address trader) public returns (uint256) {
-        return maintenanceMarginWithPrice(trader, markPrice());
+        return MarginAccount.maintenanceMarginWithPrice(trader, markPrice());
     }
 
+    /**
+     * @notice Margin balance of margin account according to mark price.
+     *         See marginBalanceWithPrice in MarginAccount.sol.
+     *
+     * @param trader Address of account owner.
+     * @return Margin balance of margin account.
+     */
     function marginBalance(address trader) public returns (int256) {
-        return marginBalanceWithPrice(trader, markPrice());
+        return MarginAccount.marginBalanceWithPrice(trader, markPrice());
     }
 
+    /**
+     * @notice Profit and loss of margin account according to mark price.
+     *         See pnlWithPrice in MarginAccount.sol.
+     *
+     * @param trader Address of account owner.
+     * @return Margin balance of margin account.
+     */
     function pnl(address trader) public returns (int256) {
-        return pnlWithPrice(trader, markPrice());
+        return MarginAccount.pnlWithPrice(trader, markPrice());
     }
 
+    /**
+     * @notice Available margin of margin account according to mark price.
+     *         See marginBalanceWithPrice in MarginAccount.sol.
+     *
+     * @param trader Address of account owner.
+     * @return Margin balance of margin account.
+     */
     function availableMargin(address trader) public returns (int256) {
-        return availableMarginWithPrice(trader, markPrice());
+        return MarginAccount.availableMarginWithPrice(trader, markPrice());
     }
 
-    // safe for liquidation
+    /**
+     * @notice Test if a margin account is safe, using maintenance margin rate.
+     *         A unsafe margin account will loss position through liqudating initiated by any other trader,
+               to make the whole system safe.
+     *
+     * @param trader Address of account owner.
+     * @return True if give trader is safe.
+     */
     function isSafe(address trader) public returns (bool) {
         uint256 currentMarkPrice = markPrice();
         return isSafeWithPrice(trader, currentMarkPrice);
     }
 
-    // safe for liquidation
+    /**
+     * @notice Test if a margin account is safe, using maintenance margin rate according to given price.
+     *
+     * @param trader           Address of account owner.
+     * @param currentMarkPrice Mark price.
+     * @return True if give trader is safe.
+     */
     function isSafeWithPrice(address trader, uint256 currentMarkPrice) public returns (bool) {
-        return marginBalanceWithPrice(trader, currentMarkPrice) >=
-            maintenanceMarginWithPrice(trader, currentMarkPrice).toInt256();
+        return
+            MarginAccount.marginBalanceWithPrice(trader, currentMarkPrice) >=
+            MarginAccount.maintenanceMarginWithPrice(trader, currentMarkPrice).toInt256();
     }
 
+    /**
+     * @notice Test if a margin account is bankrupt. Bankrupt is a status indicates the margin account
+     *         is completely out of collateral.
+     *
+     * @param trader           Address of account owner.
+     * @return True if give trader is safe.
+     */
     function isBankrupt(address trader) public returns (bool) {
         return marginBalanceWithPrice(trader, markPrice()) < 0;
     }
 
-    // safe for opening positions
+    /**
+     * @notice Test if a margin account is safe, using initial margin rate instead of maintenance margin rate.
+     *
+     * @param trader Address of account owner.
+     * @return True if give trader is safe with initial margin rate.
+     */
     function isIMSafe(address trader) public returns (bool) {
         uint256 currentMarkPrice = markPrice();
         return isIMSafeWithPrice(trader, currentMarkPrice);
     }
 
-    // safe for opening positions
+    /**
+     * @notice Test if a margin account is safe according to given mark price.
+     *
+     * @param trader Address of account owner.
+     * @param currentMarkPrice Mark price.
+     * @return True if give trader is safe with initial margin rate.
+     */    
     function isIMSafeWithPrice(address trader, uint256 currentMarkPrice) public returns (bool) {
         return availableMarginWithPrice(trader, currentMarkPrice) >= 0;
     }
 
+    /**
+     * @notice Test if a margin account is safe according to given mark price.
+     *
+     * @param trader    Address of account owner.
+     * @param maxAmount Mark price.
+     * @return True if give trader is safe with initial margin rate.
+     */  
     function liquidate(address trader, uint256 maxAmount) public returns (uint256, uint256) {
         require(msg.sender != trader, "self liquidate");
+        require(isValidLotSize(maxAmount), "invalid lot size");
         require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
         require(!isSafe(trader), "safe account");
-        require(isValidLotSize(maxAmount), "invalid lot size");
 
         uint256 liquidationPrice = markPrice();
         require(liquidationPrice > 0, "invalid price");
@@ -208,11 +346,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         LibTypes.Side side,
         uint256 price,
         uint256 amount
-    )
-        public
-        onlyWhitelisted
-        returns (uint256 takerOpened, uint256 makerOpened)
-    {
+    ) public onlyWhitelisted returns (uint256 takerOpened, uint256 makerOpened) {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
         require(isValidLotSize(amount), "invalid lot size");
@@ -224,7 +358,11 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
         emit Trade(taker, maker, side, price, amount);
     }
 
-    function transferCashBalance(address from, address to, uint256 amount) public onlyWhitelisted {
+    function transferCashBalance(
+        address from,
+        address to,
+        uint256 amount
+    ) public onlyWhitelisted {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         MarginAccount.transferBalance(from, to, amount.toInt256());
     }
@@ -237,20 +375,17 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     /**
-     * @dev Check type of collateral. If ether, rawAmount must strictly match msg.value.
+     * @notice Check type of collateral. If ether, rawAmount must strictly match msg.value.
      *
      * @param rawAmount Amount to deposit
      */
     function checkDepositingParameter(uint256 rawAmount) internal view {
         bool isToken = isTokenizedCollateral();
-        require(
-            (isToken && msg.value == 0) || (!isToken && msg.value == rawAmount),
-            "invalid depositing parameter"
-        );
+        require((isToken && msg.value == 0) || (!isToken && msg.value == rawAmount), "invalid depositing parameter");
     }
 
     /**
-     * @dev Implementation as underlaying of deposit and depositFor.
+     * @notice Implementation as underlaying of deposit and depositFor.
      *
      * @param trader    Address the collateral will be transferred from.
      * @param rawAmount Amount to deposit.
@@ -268,7 +403,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     /**
-     * @dev Implementation as underlaying of withdraw and withdrawFor.
+     * @notice Implementation as underlaying of withdraw and withdrawFor.
      *
      * @param trader    Address the collateral will be transferred to.
      * @param rawAmount Amount to withdraw.
@@ -289,18 +424,19 @@ contract Perpetual is MarginAccount, ReentrancyGuard  {
     }
 
     /**
-     * @dev Implementation as underlaying of settle.
+     * @notice Implementation as underlaying of settle.
      *
      * @param trader    Address the collateral will be transferred to.
      */
     function settleImplementation(address trader) internal {
+        require(status == LibTypes.Status.SETTLED, "wrong perpetual status");
         uint256 currentMarkPrice = markPrice();
         LibTypes.MarginAccount memory account = marginAccounts[trader];
-        if (account.size > 0) {
-            close(account, currentMarkPrice, account.size);
-            marginAccounts[trader] = account;
-            // updateBalance(trader, rpnl);
+        if (account.size == 0) {
+            return;
         }
+        close(account, currentMarkPrice, account.size);
+        marginAccounts[trader] = account;
         emit UpdatePositionAccount(trader, account, totalSize(LibTypes.Side.LONG), currentMarkPrice);
     }
 }

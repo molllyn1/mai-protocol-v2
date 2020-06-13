@@ -27,7 +27,11 @@ contract AMM is AMMGovernance {
     event CreateAMM();
     event UpdateFundingRate(LibTypes.FundingState fundingState);
 
-    constructor(address _perpetualProxy, address _priceFeeder, address _shareToken) public {
+    constructor(
+        address _perpetualProxy,
+        address _priceFeeder,
+        address _shareToken
+    ) public {
         priceFeeder = IPriceFeeder(_priceFeeder);
         perpetualProxy = IPerpetual(_perpetualProxy);
         shareToken = ShareToken(_shareToken);
@@ -177,20 +181,19 @@ contract AMM is AMMGovernance {
         return x.wdiv(y.sub(amount));
     }
 
-    function buyFrom(address trader, uint256 amount, uint256 limitPrice, uint256 deadline) private returns (uint256) {
+    function buyFrom(
+        address trader,
+        uint256 amount,
+        uint256 limitPrice,
+        uint256 deadline
+    ) private returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
 
         uint256 price = getBuyPrice(amount);
         require(limitPrice >= price, "price limited");
         require(getBlockTimestamp() <= deadline, "deadline exceeded");
-        (uint256 opened, ) = perpetualProxy.tradePosition(
-            trader,
-            tradingAccount(),
-            LibTypes.Side.LONG,
-            price,
-            amount
-        );
+        (uint256 opened, ) = perpetualProxy.tradePosition(trader, tradingAccount(), LibTypes.Side.LONG, price, amount);
 
         uint256 value = price.wmul(amount);
         uint256 fee = value.wmul(governance.poolFeeRate);
@@ -205,15 +208,20 @@ contract AMM is AMMGovernance {
         return opened;
     }
 
-    function buyFromWhitelisted(address trader, uint256 amount, uint256 limitPrice, uint256 deadline)
-        public
-        onlyWhitelisted
-        returns (uint256)
-    {
+    function buyFromWhitelisted(
+        address trader,
+        uint256 amount,
+        uint256 limitPrice,
+        uint256 deadline
+    ) public onlyWhitelisted returns (uint256) {
         return buyFrom(trader, amount, limitPrice, deadline);
     }
 
-    function buy(uint256 amount, uint256 limitPrice, uint256 deadline) public returns (uint256) {
+    function buy(
+        uint256 amount,
+        uint256 limitPrice,
+        uint256 deadline
+    ) public returns (uint256) {
         return buyFrom(msg.sender, amount, limitPrice, deadline);
     }
 
@@ -225,20 +233,19 @@ contract AMM is AMMGovernance {
         return x.wdiv(y.add(amount));
     }
 
-    function sellFrom(address trader, uint256 amount, uint256 limitPrice, uint256 deadline) private returns (uint256) {
+    function sellFrom(
+        address trader,
+        uint256 amount,
+        uint256 limitPrice,
+        uint256 deadline
+    ) private returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
 
         uint256 price = getSellPrice(amount);
         require(limitPrice <= price, "price limited");
         require(getBlockTimestamp() <= deadline, "deadline exceeded");
-        (uint256 opened, ) = perpetualProxy.tradePosition(
-            trader,
-            tradingAccount(),
-            LibTypes.Side.SHORT,
-            price,
-            amount
-        );
+        (uint256 opened, ) = perpetualProxy.tradePosition(trader, tradingAccount(), LibTypes.Side.SHORT, price, amount);
 
         uint256 value = price.wmul(amount);
         uint256 fee = value.wmul(governance.poolFeeRate);
@@ -252,15 +259,20 @@ contract AMM is AMMGovernance {
         return opened;
     }
 
-    function sellFromWhitelisted(address trader, uint256 amount, uint256 limitPrice, uint256 deadline)
-        public
-        onlyWhitelisted
-        returns (uint256)
-    {
+    function sellFromWhitelisted(
+        address trader,
+        uint256 amount,
+        uint256 limitPrice,
+        uint256 deadline
+    ) public onlyWhitelisted returns (uint256) {
         return sellFrom(trader, amount, limitPrice, deadline);
     }
 
-    function sell(uint256 amount, uint256 limitPrice, uint256 deadline) public returns (uint256) {
+    function sell(
+        uint256 amount,
+        uint256 limitPrice,
+        uint256 deadline
+    ) public returns (uint256) {
         return sellFrom(msg.sender, amount, limitPrice, deadline);
     }
 
@@ -278,13 +290,7 @@ contract AMM is AMMGovernance {
 
         uint256 collateralAmount = amount.wmul(price).mul(2);
         perpetualProxy.transferCashBalance(trader, tradingAccount(), collateralAmount);
-        (uint256 opened, ) = perpetualProxy.tradePosition(
-            trader,
-            tradingAccount(),
-            LibTypes.Side.SHORT,
-            price,
-            amount
-        );
+        (uint256 opened, ) = perpetualProxy.tradePosition(trader, tradingAccount(), LibTypes.Side.SHORT, price, amount);
 
         mintShareTokenTo(trader, shareToken.totalSupply().wmul(amount).wdiv(oldPoolPositionSize));
 
@@ -304,18 +310,12 @@ contract AMM is AMMGovernance {
         uint256 price = oldAvailableMargin.wdiv(oldPoolPositionSize);
         uint256 amount = shareAmount.wmul(oldPoolPositionSize).wdiv(shareToken.totalSupply());
         // align to lotSize
-        uint256 tradingLotSize = perpetualProxy.getGovernance().tradingLotSize;
-        amount = amount.sub(amount.mod(tradingLotSize));
+        uint256 lotSize = perpetualProxy.getGovernance().lotSize;
+        amount = amount.sub(amount.mod(lotSize));
 
         perpetualProxy.transferCashBalance(tradingAccount(), trader, price.wmul(amount).mul(2));
         burnShareTokenFrom(trader, shareAmount);
-        (uint256 opened, ) = perpetualProxy.tradePosition(
-            trader,
-            tradingAccount(),
-            LibTypes.Side.LONG,
-            price,
-            amount
-        );
+        (uint256 opened, ) = perpetualProxy.tradePosition(trader, tradingAccount(), LibTypes.Side.LONG, price, amount);
 
         forceFunding(); // x, y changed, so fair price changed. we need funding now
         mustSafe(trader, opened);
@@ -340,10 +340,7 @@ contract AMM is AMMGovernance {
         uint256 tradeAmount,
         uint256 limitPrice,
         uint256 deadline
-    )
-        public
-        payable
-    {
+    ) public payable {
         if (depositAmount > 0) {
             perpetualProxy.depositFor.value(msg.value)(msg.sender, depositAmount);
         }
@@ -359,10 +356,7 @@ contract AMM is AMMGovernance {
         uint256 tradeAmount,
         uint256 limitPrice,
         uint256 deadline
-    )
-        public
-        payable
-    {
+    ) public payable {
         if (depositAmount > 0) {
             perpetualProxy.depositFor.value(msg.value)(msg.sender, depositAmount);
         }
@@ -373,7 +367,12 @@ contract AMM is AMMGovernance {
 
     // this is a composite function of perp.setBroker + amm.buy + perp.withdraw
     // composite functions accept amount = 0
-    function buyAndWithdraw(uint256 tradeAmount, uint256 limitPrice, uint256 deadline, uint256 withdrawAmount) public {
+    function buyAndWithdraw(
+        uint256 tradeAmount,
+        uint256 limitPrice,
+        uint256 deadline,
+        uint256 withdrawAmount
+    ) public {
         if (tradeAmount > 0) {
             buy(tradeAmount, limitPrice, deadline);
         }
@@ -384,7 +383,12 @@ contract AMM is AMMGovernance {
 
     // this is a composite function of perp.setBroker + amm.sell + perp.withdraw
     // composite functions accept amount = 0
-    function sellAndWithdraw(uint256 tradeAmount, uint256 limitPrice, uint256 deadline, uint256 withdrawAmount) public {
+    function sellAndWithdraw(
+        uint256 tradeAmount,
+        uint256 limitPrice,
+        uint256 deadline,
+        uint256 withdrawAmount
+    ) public {
         if (tradeAmount > 0) {
             sell(tradeAmount, limitPrice, deadline);
         }
@@ -461,18 +465,10 @@ contract AMM is AMMGovernance {
         int256 available = account.cashBalance;
         int256 socialLossPerContract = perpetualProxy.socialLossPerContract(account.side);
         available = available.sub(account.entryValue.toInt256());
-        available = available
-            .sub(
-                socialLossPerContract
-                    .wmul(account.size.toInt256())
-                    .sub(account.entrySocialLoss)
-            );
-        available = available
-            .sub(
-                fundingState.accumulatedFundingPerContract
-                    .wmul(account.size.toInt256())
-                    .sub(account.entryFundingLoss)
-            );
+        available = available.sub(socialLossPerContract.wmul(account.size.toInt256()).sub(account.entrySocialLoss));
+        available = available.sub(
+            fundingState.accumulatedFundingPerContract.wmul(account.size.toInt256()).sub(account.entryFundingLoss)
+        );
         return available.max(0).toUint256();
     }
 
@@ -517,7 +513,11 @@ contract AMM is AMMGovernance {
         forceFunding(blockTime, newIndexPrice, newIndexTimestamp);
     }
 
-    function forceFunding(uint256 blockTime, uint256 newIndexPrice, uint256 newIndexTimestamp) internal {
+    function forceFunding(
+        uint256 blockTime,
+        uint256 newIndexPrice,
+        uint256 newIndexTimestamp
+    ) internal {
         if (fundingState.lastFundingTime == 0) {
             // funding initialization required. but in this case, it's safe to just do nothing and return
             return;
@@ -538,9 +538,11 @@ contract AMM is AMMGovernance {
         emit UpdateFundingRate(fundingState);
     }
 
-    function nextStateWithTimespan(LibTypes.MarginAccount memory account, uint256 newIndexPrice, uint256 endTimestamp)
-        private
-    {
+    function nextStateWithTimespan(
+        LibTypes.MarginAccount memory account,
+        uint256 newIndexPrice,
+        uint256 endTimestamp
+    ) private {
         require(fundingState.lastFundingTime != 0, "funding initialization required");
         require(endTimestamp >= fundingState.lastFundingTime, "we can't go back in time");
 
