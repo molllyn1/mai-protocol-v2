@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 import "../interface/IPriceFeeder.sol";
-import "../interface/IPerpetualProxy.sol";
+import "../interface/IPerpetual.sol";
 
 
 contract AMMGovernance is WhitelistedRole {
@@ -21,7 +21,7 @@ contract AMMGovernance is WhitelistedRole {
     int256 public emaAlpha2; // 1 - emaAlpha
     int256 public emaAlpha2Ln; // ln(emaAlpha2)
 
-    IPerpetualProxy public perpetualProxy;
+    IPerpetual public perpetualProxy;
     IPriceFeeder public priceFeeder;
 
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
@@ -44,7 +44,7 @@ contract AMMGovernance is WhitelistedRole {
         } else if (key == "fundingDampener") {
             governance.fundingDampener = value;
         } else if (key == "accumulatedFundingPerContract") {
-            require(perpetualProxy.status() == LibTypes.Status.SETTLING, "wrong perpetual status");
+            require(perpetualProxy.status() == LibTypes.Status.EMERGENCY, "wrong perpetual status");
             fundingState.accumulatedFundingPerContract = value;
         } else if (key == "priceFeeder") {
             require(Address.isContract(address(value)), "wrong address");

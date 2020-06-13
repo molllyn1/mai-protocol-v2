@@ -790,9 +790,6 @@ contract AMM is AMMGovernance {
      * 1. funding from [lastFundingTime, lastIndexTimestamp)
      * 2. funding from [lastIndexTimestamp, blockTime)
      *
-     * @param blockTime The real end time.
-     * @param newIndexPrice The latest index price.
-     * @param newIndexTimestamp The timestamp of the latest index.
      */
     function forceFunding() internal {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
