@@ -25,10 +25,6 @@ interface IPerpetual {
 
     function collateral() external view returns (address);
 
-    function isWhitelisted(address account) external view returns (bool);
-
-    function currentBroker(address guy) external view returns (address);
-
     function amm() external view returns (IAMM);
 
     function totalSize(LibTypes.Side side) external view returns (uint256);
@@ -65,23 +61,13 @@ interface IPerpetual {
         uint256 amount
     ) external;
 
-    function setBrokerFor(address guy, address broker) external;
-
     function depositFor(address guy, uint256 amount) external payable;
 
     function withdrawFor(address payable guy, uint256 amount) external;
 
     function liquidate(address guy, uint256 amount) external returns (uint256, uint256);
 
-    function liquidateFrom(
-        address from,
-        address guy,
-        uint256 amount
-    ) external returns (uint256, uint256);
-
     function insuranceFundBalance() external view returns (int256);
-
-    function isWhitelistAdmin(address guy) external view returns (bool);
 
     function beginGlobalSettlement(uint256 price) external;
 

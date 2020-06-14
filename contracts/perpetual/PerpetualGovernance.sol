@@ -1,8 +1,6 @@
 pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
-import "@openzeppelin/contracts/access/roles/WhitelistedRole.sol";
-
 import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 import "./PerpetualStorage.sol";
@@ -20,13 +18,23 @@ contract PerpetualGovernance is PerpetualStorage {
         _;
     }
 
+    modifier onlyOwner() {
+        require(globalConfig.owner() == msg.sender, "not owner");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(globalConfig.isAuthorizedComponent(msg.sender), "unauthorized caller");
+        _;
+    }
+
     /**
      * @dev Set governance parameters.
      *
      * @param key   Name of parameter.
      * @param value Value of parameter.
      */
-    function setGovernanceParameter(bytes32 key, int256 value) public onlyWhitelistAdmin {
+    function setGovernanceParameter(bytes32 key, int256 value) public onlyOwner {
         if (key == "initialMarginRate") {
             governance.initialMarginRate = value.toUint256();
             require(governance.initialMarginRate > 0, "require im > 0");
@@ -75,7 +83,7 @@ contract PerpetualGovernance is PerpetualStorage {
      * @param key   Name of parameter.
      * @param value Address to set.
      */
-    function setGovernanceAddress(bytes32 key, address value) public onlyWhitelistAdmin {
+    function setGovernanceAddress(bytes32 key, address value) public onlyOwner {
         require(value != address(0), "invalid address");
         if (key == "dev") {
             devAddress = value;

@@ -15,7 +15,6 @@ import "./PerpetualGovernance.sol";
  */
 contract Collateral is PerpetualGovernance {
     using LibMathSigned for int256;
-    using LibMathUnsigned for uint256;
     using SafeERC20 for IERC20;
 
     // Available decimals should be within [0, 18]

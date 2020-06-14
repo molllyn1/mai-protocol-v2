@@ -1,7 +1,7 @@
 pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
-import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
+import  "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 import "./Collateral.sol";
 
@@ -16,7 +16,6 @@ contract MarginAccount is Collateral {
         uint256 perpetualTotalSize,
         uint256 price
     );
-
     event UpdateInsuranceFund(int256 newVal);
     event Transfer(address indexed from, address indexed to, int256 wadAmount, int256 balanceFrom, int256 balanceTo);
     event InternalUpdateBalance(address indexed trader, int256 wadAmount, int256 balance);

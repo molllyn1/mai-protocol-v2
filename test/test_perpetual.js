@@ -13,9 +13,9 @@ const {
 const TestToken = artifacts.require('test/TestToken.sol');
 const TestFundingMock = artifacts.require('test/TestFundingMock.sol');
 const TestPerpetual = artifacts.require('test/TestPerpetual.sol');
-const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 
-contract('TestPerpetual', accounts => {
+contract('TestPerpetual', async accounts => {
     const NORMAL = 0;
     const SETTLING = 1;
     const SETTLED = 2;
@@ -57,8 +57,9 @@ contract('TestPerpetual', accounts => {
     };
 
     const deploy = async (cDecimals = 18) => {
-        collateral = await TestToken.new("TT", "TestToken", cDecimals);
         global = await GlobalConfig.new();
+        assert.equal(await global.owner(), admin);
+        collateral = await TestToken.new("TT", "TestToken", cDecimals);
         funding = await TestFundingMock.new();
         perpetual = await TestPerpetual.new(
             global.address,
@@ -68,12 +69,6 @@ contract('TestPerpetual', accounts => {
         );
         await perpetual.setGovernanceAddress(toBytes32("amm"), funding.address);
         await setDefaultGovParameters();
-    };
-
-    const increaseBlockBy = async (n) => {
-        for (let i = 0; i < n; i++) {
-            await increaseEvmBlock();
-        }
     };
 
     const positionSize = async (user) => {
@@ -122,7 +117,8 @@ contract('TestPerpetual', accounts => {
             const priceAfter = new BigNumber("7777777777777777777778");
             const amount = new BigNumber("1111111111111111113");
 
-            await perpetual.addWhitelisted(admin);
+            // await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, initial);
 
             await increaseBlockBy(5);
@@ -157,6 +153,9 @@ contract('TestPerpetual', accounts => {
             assert.ok(Number(profit) <= Number(loss));
         });
     });
+
+    return;
+
 
     describe("collateral - ether", async () => {
         beforeEach(async () => {
@@ -209,7 +208,7 @@ contract('TestPerpetual', accounts => {
             }
             assert.equal(await cashBalanceOf(u1), toWad(0));
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000), { value: toWad(1000), from: admin });
             assert.equal(await cashBalanceOf(u1), toWad(1000));
         });
@@ -225,7 +224,7 @@ contract('TestPerpetual', accounts => {
             } catch (error) {
                 assert.ok(error.message.includes("invalid depositing parameter"));
             }
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             try {
                 await perpetual.depositFor(u1, toWad(1000), { from: admin, value: toWad(1001) });
             } catch (error) {
@@ -255,7 +254,7 @@ contract('TestPerpetual', accounts => {
             await collateral.transfer(u1, toWad(1000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             await collateral.transfer(u2, toWad(1000));
@@ -305,7 +304,7 @@ contract('TestPerpetual', accounts => {
         beforeEach(async () => {
             await deploy();
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
 
             await collateral.transfer(u1, toWad(1000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
@@ -580,7 +579,7 @@ contract('TestPerpetual', accounts => {
         it('depositFor', async () => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
 
             try {
                 await perpetual.depositFor(u1, toWad(1000), { value: toWad(1000), from: admin });
@@ -620,7 +619,7 @@ contract('TestPerpetual', accounts => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             assert.equal(fromWad(await cashBalanceOf(u1)), 1000);
@@ -641,7 +640,7 @@ contract('TestPerpetual', accounts => {
         it('withdraw - deposit + withdraw', async () => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             assert.equal(fromWad(await cashBalanceOf(u1)), 1000);
@@ -657,7 +656,7 @@ contract('TestPerpetual', accounts => {
                 from: u1
             });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(7000 * 0.1));
 
             await increaseBlockBy(5);
@@ -705,7 +704,7 @@ contract('TestPerpetual', accounts => {
                 from: u1
             });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
 
             assert.equal(fromWad(await cashBalanceOf(u1)), 1000);
 
@@ -806,7 +805,7 @@ contract('TestPerpetual', accounts => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(700));
 
             await funding.setMarkPrice(toWad(7000));
@@ -846,7 +845,7 @@ contract('TestPerpetual', accounts => {
                 from: u1
             });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(700));
 
             await funding.setMarkPrice(toWad(7000));
@@ -884,7 +883,7 @@ contract('TestPerpetual', accounts => {
                 from: u1
             });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             await funding.setMarkPrice(toWad(7000));
@@ -919,7 +918,7 @@ contract('TestPerpetual', accounts => {
                 from: u1
             });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             await increaseBlockBy(5);
@@ -969,7 +968,7 @@ contract('TestPerpetual', accounts => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             await increaseBlockBy(5);
@@ -1010,7 +1009,7 @@ contract('TestPerpetual', accounts => {
                 from: u1
             });
 
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             await funding.setMarkPrice(toWad(7000));
@@ -1058,7 +1057,7 @@ contract('TestPerpetual', accounts => {
             await collateral.approve(perpetual.address, infinity, {
                 from: u1
             });
-            await perpetual.addWhitelisted(admin);
+            await global.addAuthorizedComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(700));
 
             await funding.setMarkPrice(toWad(7000));

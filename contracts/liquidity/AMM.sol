@@ -16,16 +16,19 @@ contract AMM is AMMGovernance {
 
     int256 private constant FUNDING_PERIOD = 28800; // 8 * 3600;
 
+    // ERC20 token
     ShareToken private shareToken;
 
     event CreateAMM();
     event UpdateFundingRate(LibTypes.FundingState fundingState);
 
     constructor(
+        address _globalConfig,
         address _perpetualProxy,
         address _priceFeeder,
         address _shareToken
     ) public {
+        globalConfig = IGlobalConfig(_globalConfig);
         priceFeeder = IPriceFeeder(_priceFeeder);
         perpetualProxy = IPerpetual(_perpetualProxy);
         shareToken = ShareToken(_shareToken);
@@ -76,17 +79,6 @@ contract AMM is AMMGovernance {
     function lastAvailableMargin() internal view returns (uint256) {
         LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
         return availableMarginFromPoolAccount(account);
-    }
-
-    /**
-     * @notice FairPrice.
-     *
-     * Note: last* functions (lastFundingState, lastAvailableMargin, lastFairPrice, etc.) are calculated based on
-     *       the on-chain fundingState. current* functions are calculated based on the current timestamp.
-     */
-    function lastFairPrice() internal view returns (uint256) {
-        LibTypes.MarginAccount memory account = perpetualProxy.getMarginAccount(tradingAccount());
-        return fairPriceFromPoolAccount(account);
     }
 
     /**
@@ -306,7 +298,10 @@ contract AMM is AMMGovernance {
         uint256 amount,
         uint256 limitPrice,
         uint256 deadline
-    ) private returns (uint256) {
+    ) 
+        private 
+        returns (uint256) 
+    {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
 
@@ -331,7 +326,7 @@ contract AMM is AMMGovernance {
     /**
      * @notice Buy/long with AMM if the trader comes from the whitelist.
      *
-     * @param trader The trader.
+     * @param trader The trader.W
      * @param amount Buy amount.
      * @param limitPrice Assert the trading price <= limitPrice.
      * @param deadline Assert the trading time <= deadline.
@@ -341,7 +336,11 @@ contract AMM is AMMGovernance {
         uint256 amount,
         uint256 limitPrice,
         uint256 deadline
-    ) public onlyWhitelisted returns (uint256) {
+    ) 
+        public 
+        onlyAuthorized 
+        returns (uint256) 
+    {
         return buyFrom(trader, amount, limitPrice, deadline);
     }
 
@@ -420,7 +419,11 @@ contract AMM is AMMGovernance {
         uint256 amount,
         uint256 limitPrice,
         uint256 deadline
-    ) public onlyWhitelisted returns (uint256) {
+    ) 
+        public 
+        onlyAuthorized 
+        returns (uint256) 
+    {
         return sellFrom(trader, amount, limitPrice, deadline);
     }
 

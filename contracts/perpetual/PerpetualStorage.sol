@@ -1,7 +1,6 @@
 pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
-import "@openzeppelin/contracts/access/roles/WhitelistedRole.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "../lib/LibMath.sol";
@@ -11,7 +10,7 @@ import "../interface/IAMM.sol";
 import "../interface/IGlobalConfig.sol";
 
 
-contract PerpetualStorage is WhitelistedRole {
+contract PerpetualStorage {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
@@ -41,7 +40,7 @@ contract PerpetualStorage is WhitelistedRole {
     // Mapping from owner to its margin account
     mapping (address => LibTypes.MarginAccount) internal marginAccounts;
 
-    // TODO: Should be SocialLoss but to compatible off-line part
+    // TODO: Should be UpdateSocialLoss but to compatible off-chain part
     event SocialLoss(LibTypes.Side side, int256 newVal);
 
     /**

@@ -1,16 +1,16 @@
 pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
-import "@openzeppelin/contracts/access/roles/WhitelistedRole.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
+import "../interface/IGlobalConfig.sol";
 import "../interface/IPriceFeeder.sol";
 import "../interface/IPerpetual.sol";
 
 
-contract AMMGovernance is WhitelistedRole {
+contract AMMGovernance {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
@@ -23,10 +23,21 @@ contract AMMGovernance is WhitelistedRole {
 
     IPerpetual public perpetualProxy;
     IPriceFeeder public priceFeeder;
+    IGlobalConfig public globalConfig;
 
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
 
-    function setGovernanceParameter(bytes32 key, int256 value) public onlyWhitelistAdmin {
+    modifier onlyOwner() {
+        require(globalConfig.owner() == msg.sender, "not owner");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(globalConfig.isAuthorizedComponent(msg.sender), "unauthorized caller");
+        _;
+    }
+
+    function setGovernanceParameter(bytes32 key, int256 value) public onlyOwner {
         if (key == "poolFeeRate") {
             governance.poolFeeRate = value.toUint256();
         } else if (key == "poolDevFeeRate") {

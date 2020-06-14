@@ -2,7 +2,7 @@ pragma solidity 0.5.15;
 
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 
-import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
+import "../lib/LibMath.sol";
 import "../interface/IChainlinkFeeder.sol";
 
 

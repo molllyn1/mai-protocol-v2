@@ -2,7 +2,7 @@ pragma solidity 0.5.15;
 pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibTypes.sol";
-import "../interface/IPerpetualProxy.sol";
+import "../interface/IPerpetual.sol";
 
 
 interface IAMM {
@@ -12,7 +12,7 @@ interface IAMM {
 
     function getGovernance() external view returns (LibTypes.AMMGovernanceConfig memory);
 
-    function perpetualProxy() external view returns (IPerpetualProxy);
+    function perpetualProxy() external view returns (IPerpetual);
 
     function currentMarkPrice() external returns (uint256);
 

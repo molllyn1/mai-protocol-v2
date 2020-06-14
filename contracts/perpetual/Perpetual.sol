@@ -29,9 +29,16 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         address _devAddress,
         address _collateral,
         uint256 _collateralDecimals
-    ) public MarginAccount(_collateral, _collateralDecimals) {
-        setGovernanceAddress("globalConfig", _globalConfig);
-        setGovernanceAddress("dev", _devAddress);
+    ) 
+        public 
+        MarginAccount(_collateral, _collateralDecimals) 
+    {
+
+        globalConfig = _globalConfig;
+        devAddress = _devAddress;
+
+        // setGovernanceAddress("globalConfig", _globalConfig);
+        // setGovernanceAddress("dev", _devAddress);
 
         emit CreatePerpetual();
     }
@@ -49,7 +56,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader Address of account owner.
      * @param amount Absolute cash balance value to be set.
      */
-    function setCashBalance(address trader, int256 amount) public onlyWhitelistAdmin {
+    function setCashBalance(address trader, int256 amount) public onlyOwner {
         require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
         int256 deltaAmount = amount.sub(marginAccounts[trader].cashBalance);
         marginAccounts[trader].cashBalance = amount;
@@ -62,7 +69,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param price Price used as mark price in emergency mode.
      */
-    function beginGlobalSettlement(uint256 price) public onlyWhitelistAdmin {
+    function beginGlobalSettlement(uint256 price) public onlyOwner {
         setEmergencyStatus();
         settlementPrice = price;
         emit UpdateSettlementPrice(price);
@@ -73,7 +80,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *         In settled mode, user is expected to closed positions and withdraw all the collateral.
      * @notice endGlobalSettlement will also settle all postition belongs to amm.
      */
-    function endGlobalSettlement() public onlyWhitelistAdmin {
+    function endGlobalSettlement() public onlyOwner {
         setSettledStatus();
         address ammTrader = address(amm.perpetualProxy());
         settleImplementation(ammTrader);
@@ -101,7 +108,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param rawAmount Amount to withdraw.
      */
-    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyWhitelistAdmin nonReentrant {
+    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyOwner nonReentrant {
         require(rawAmount > 0, "invalid amount");
         require(insuranceFundBalance > 0, "insufficient funds");
 
@@ -164,7 +171,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address of margin account to deposit into.
      * @param rawAmount Amount of collateral to deposit.
      */
-    function depositFor(address trader, uint256 rawAmount) public payable onlyWhitelisted nonReentrant {
+    function depositFor(address trader, uint256 rawAmount) public payable onlyAuthorized nonReentrant {
         depositImplementation(trader, rawAmount);
     }
 
@@ -176,7 +183,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address of margin account to deposit into.
      * @param rawAmount Amount of collateral to deposit.
      */
-    function withdrawFor(address payable trader, uint256 rawAmount) public onlyWhitelisted nonReentrant {
+    function withdrawFor(address payable trader, uint256 rawAmount) public onlyAuthorized nonReentrant {
         withdrawImplementation(trader, rawAmount);
     }
 
@@ -315,7 +322,13 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param maxAmount Mark price.
      * @return True if give trader is safe with initial margin rate.
      */  
-    function liquidate(address trader, uint256 maxAmount) public returns (uint256, uint256) {
+    function liquidate(
+        address trader, 
+        uint256 maxAmount
+    ) 
+        public 
+        returns (uint256, uint256) 
+    {
         require(msg.sender != trader, "self liquidate");
         require(isValidLotSize(maxAmount), "invalid lot size");
         require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
@@ -346,7 +359,11 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         LibTypes.Side side,
         uint256 price,
         uint256 amount
-    ) public onlyWhitelisted returns (uint256 takerOpened, uint256 makerOpened) {
+    ) 
+        public 
+        onlyAuthorized 
+        returns (uint256 takerOpened, uint256 makerOpened) 
+    {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
         require(isValidLotSize(amount), "invalid lot size");
@@ -362,7 +379,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         address from,
         address to,
         uint256 amount
-    ) public onlyWhitelisted {
+    ) public onlyAuthorized {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         MarginAccount.transferBalance(from, to, amount.toInt256());
     }

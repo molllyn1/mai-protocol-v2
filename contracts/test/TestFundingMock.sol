@@ -3,7 +3,7 @@ pragma experimental ABIEncoderV2; // to enable structure-type parameter
 
 import "../lib/LibOrder.sol";
 import "../lib/LibTypes.sol";
-import "../interface/IPerpetualProxy.sol";
+import "../interface/IPerpetual.sol";
 import {LibMathSigned, LibMathUnsigned} from "../lib/LibMath.sol";
 
 
@@ -36,12 +36,12 @@ contract TestFundingMock {
 
     int256 dummy; // in order to prevent seeing "can be restricted to pure"
 
-    function perpetualProxy() external view returns (IPerpetualProxy) {
+    function perpetualProxy() external view returns (IPerpetual) {
         if (dummy == 0) {
-            return IPerpetualProxy(address(0x0000000000000000000000000000000000000111));
+            return IPerpetual(address(0x0000000000000000000000000000000000000111));
         }
 
         // never be here
-        return IPerpetualProxy(address(0x0000000000000000000000000000000000000000));
+        return IPerpetual(address(0x0000000000000000000000000000000000000000));
     }
 }
