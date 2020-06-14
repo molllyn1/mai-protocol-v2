@@ -27,4 +27,5 @@ contract GlobalConfig is Ownable {
         emit RemoveAuthorizedBroker(broker);
     }
 
+
 }
