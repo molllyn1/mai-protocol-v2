@@ -73,12 +73,12 @@ contract('amm', accounts => {
             18
         );
         proxy = await Proxy.new(perpetual.address);
-        amm = await AMM.new(proxy.address, priceFeeder.address, share.address);
+        amm = await AMM.new(globalConfig.address, proxy.address, priceFeeder.address, share.address);
         await share.addMinter(amm.address);
         await share.renounceMinter();
 
         await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
-        await perpetual.addWhitelisted(proxy.address);
+        await globalConfig.addComponent(perpetual.address, proxy.address);
     };
 
 
@@ -108,15 +108,6 @@ contract('amm', accounts => {
         // priceFeeder will modify index.timestamp, amm.timestamp should >= index.timestamp
         const index = await amm.indexPrice();
         await amm.setBlockTimestamp(index.timestamp);
-    };
-
-    const setBroker = async (user, broker) => {
-        await perpetual.setBroker(broker, {
-            from: user
-        });
-        for (let i = 0; i < 4; i++) {
-            await increaseEvmBlock();
-        }
     };
 
     const positionSize = async (user) => {

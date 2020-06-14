@@ -33,9 +33,9 @@ contract('TestPerpGovernance', accounts => {
     };
 
     const deploy = async () => {
-        governance = await TestPerpGovernance.new();
-        ammGovernance = await AMMGovernance.new();
         globalConfig = await GlobalConfig.new();
+        governance = await TestPerpGovernance.new(globalConfig.address);
+        ammGovernance = await AMMGovernance.new(globalConfig.address);
 
         await useDefaultGovParameters();
         await usePoolDefaultParameters();
@@ -182,9 +182,6 @@ contract('TestPerpGovernance', accounts => {
         });
 
         it('set global config', async () => {
-            let addr = await governance.globalConfig();
-            assert.equal(addr, "0x0000000000000000000000000000000000000000");
-
             let config = await GlobalConfig.new();
             await governance.setGovernanceAddress(toBytes32("globalConfig"), config.address);
             addr = await governance.globalConfig();
@@ -201,7 +198,7 @@ contract('TestPerpGovernance', accounts => {
             try {
                 await governance.setGovernanceAddress(toBytes32("amm"), u3, { from: u1 });
             } catch (error) {
-                assert.ok(error.message.includes("WhitelistAdmin role"), error);
+                assert.ok(error.message.includes("not owner"), error);
             }
         });
 
@@ -259,7 +256,7 @@ contract('TestPerpGovernance', accounts => {
                 await governance.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.5), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("WhitelistAdmin role"), error);
+                assert.ok(error.message.includes("not owner"), error);
             }
         });
     });
@@ -337,42 +334,139 @@ contract('TestPerpGovernance', accounts => {
         const status = await governance.status();
         return status == SETTLED
     }
-
-    describe("status", async () => {
+    describe("exceptions", async () => {
         beforeEach(deploy);
 
-        it("setEmergencyStatusPublic", async () => {
-            assert.equal(await governance.status(), NORMAL);
-            await governance.setEmergencyStatusPublic();
-            assert.equal(await governance.status(), EMERGENCY);
-            assert.equal(await isEmergency(), true);
-            assert.equal(await isGlobalSettled(), false);
+        it ("global config - owner", async () => {
+            try {
+                await globalConfig.addBroker(u1, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
+            try {
+                await globalConfig.removeBroker(u1, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
+            try {
+                await globalConfig.addComponent(u1, u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
+            try {
+                await globalConfig.removeComponent(u1, u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
+            try {
+                await globalConfig.addPauseController(u1, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
+            try {
+                await globalConfig.removePauseController(u1, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
+            try {
+                await globalConfig.addWithdrawController(u1, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
+            try {
+                await globalConfig.removeWithdrawControllers(u1, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("not the owner"));
+            }
         });
 
-        it("setEmergencyStatusPublic again", async () => {
-            assert.equal(await governance.status(), NORMAL);
-            await governance.setEmergencyStatusPublic();
-            assert.equal(await governance.status(), EMERGENCY);
-            assert.equal(await isEmergency(), true);
-            assert.equal(await isGlobalSettled(), false);
-
-            await governance.setEmergencyStatusPublic();
-            assert.equal(await governance.status(), EMERGENCY);
-            assert.equal(await isEmergency(), true);
-            assert.equal(await isGlobalSettled(), false);
+        it ("broker", async () => {
+            await globalConfig.transferOwnership(u1);
+            await globalConfig.addBroker(u2, {from: u1});
+            try {
+                await globalConfig.addBroker(u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("address already exist"));
+            }
+            assert.ok(await globalConfig.brokers(u2));
+            await globalConfig.removeBroker(u2, {from: u1});
+            try {
+                await globalConfig.removeBroker(u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("address not exist"));
+            }
+            assert.ok(!(await globalConfig.brokers(u2)));
         });
 
-        it("setSettledStatusPublic", async () => {
-            assert.equal(await governance.status(), NORMAL);
-            await governance.setEmergencyStatusPublic();
-            assert.equal(await governance.status(), EMERGENCY);
-            assert.equal(await isEmergency(), true);
-            assert.equal(await isGlobalSettled(), false);
+        it ("PauseController", async () => {
+            await globalConfig.transferOwnership(u1);
+            await globalConfig.addPauseController(u2, {from: u1});
+            try {
+                await globalConfig.addPauseController(u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("address already exist"));
+            }
+            assert.ok(await globalConfig.pauseControllers(u2));
+            await globalConfig.removePauseController(u2, {from: u1});
+            try {
+                await globalConfig.removePauseController(u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("address not exist"));
+            }
+            assert.ok(!(await globalConfig.pauseControllers(u2)));
+        });
 
-            await governance.setSettledStatusPublic();
-            assert.equal(await governance.status(), SETTLED);
-            assert.equal(await isEmergency(), false);
-            assert.equal(await isGlobalSettled(), true);
+        it ("WithdrawController", async () => {
+            await globalConfig.transferOwnership(u1);
+            await globalConfig.addWithdrawController(u2, {from: u1});
+            try {
+                await globalConfig.addWithdrawController(u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("address already exist"));
+            }
+            assert.ok(await globalConfig.withdrawControllers(u2));
+            await globalConfig.removeWithdrawControllers(u2, {from: u1});
+            try {
+                await globalConfig.removeWithdrawControllers(u2, {from: u1});
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("address not exist"));
+            }
+            assert.ok(!(await globalConfig.withdrawControllers(u2)));
+        });
+
+
+        it ("component", async () => {
+            await globalConfig.addComponent(u1, u2);
+            try {
+                await globalConfig.addComponent(u1, u2);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("component already exist"));
+            }
+            assert.ok(await globalConfig.isComponent(u2, { from: u1 }));
+
+            await globalConfig.removeComponent(u1, u2);
+            try {
+                await globalConfig.removeComponent(u1, u2);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("component not exist"));
+            }
+            assert.ok(!(await globalConfig.isComponent(u2, { from: u1 })));
         });
     });
 });

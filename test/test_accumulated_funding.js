@@ -4,10 +4,10 @@ const { toWei, fromWei, toWad, fromWad, infinity, Side } = require('./constants'
 const { toBytes32 } = require('./funcs');
 const TestToken = artifacts.require('test/TestToken.sol');
 const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
-const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 
 contract('AccumulatedFunding', accounts => {
@@ -34,7 +34,7 @@ contract('AccumulatedFunding', accounts => {
             18
         );
         proxy = await Proxy.new(perpetual.address);
-        amm = await AMM.new(proxy.address, priceFeeder.address, share.address);
+        amm = await AMM.new(globalConfig.address, proxy.address, priceFeeder.address, share.address);
         await share.addMinter(amm.address);
         await share.renounceMinter();
 

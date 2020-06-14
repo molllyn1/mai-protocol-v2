@@ -14,6 +14,9 @@ contract PerpetualStorage {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
+    bool public paused = false; 
+    bool public withdrawDisabled = false;
+
     // Global configuation instance address
     IGlobalConfig public globalConfig;
     // AMM address
@@ -30,7 +33,6 @@ contract PerpetualStorage {
     LibTypes.PerpGovernanceConfig internal governance;
     // Insurance balance
     int256 public insuranceFundBalance;
-
     // Total size
     uint256[3] internal totalSizes;
     // Socialloss

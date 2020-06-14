@@ -56,12 +56,6 @@ contract('exchange-amm', accounts => {
         u4,
     };
 
-    const increaseBlockBy = async (n) => {
-        for (let i = 0; i < n; i++) {
-            await increaseEvmBlock();
-        }
-    };
-
     const deploy = async () => {
         globalConfig = await GlobalConfig.new();
         exchange = await Exchange.new(globalConfig.address);
@@ -75,15 +69,16 @@ contract('exchange-amm', accounts => {
             18
         );
         proxy = await Proxy.new(perpetual.address);
-        amm = await AMM.new(proxy.address, priceFeeder.address, share.address);
+        amm = await AMM.new(globalConfig.address, proxy.address, priceFeeder.address, share.address);
         await share.addMinter(amm.address);
         await share.renounceMinter();
 
         await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
-        await perpetual.addWhitelisted(proxy.address);
-        await perpetual.addWhitelisted(exchange.address);
 
-        await globalConfig.addAuthorizedBroker(admin);
+        await globalConfig.addBroker(admin);
+        await globalConfig.addComponent(perpetual.address, proxy.address);
+        await globalConfig.addComponent(perpetual.address, exchange.address);
+        await globalConfig.addComponent(amm.address, exchange.address);
     };
 
     const useDefaultGovParameters = async () => {
@@ -167,24 +162,13 @@ contract('exchange-amm', accounts => {
             await collateral.transfer(u1, toWad(7000 * 21));
             await collateral.transfer(u2, toWad(7000 * 3));
             await collateral.transfer(dev, toWad(7000 * 3));
-            await collateral.approve(perpetual.address, infinity, {
-                from: u1
-            });
-            await collateral.approve(perpetual.address, infinity, {
-                from: u2
-            });
-            await collateral.approve(perpetual.address, infinity, {
-                from: dev
-            });
+            await collateral.approve(perpetual.address, infinity, { from: u1 });
+            await collateral.approve(perpetual.address, infinity, { from: u2 });
+            await collateral.approve(perpetual.address, infinity, { from: dev });
 
             // create amm
-            await perpetual.deposit(toWad(7000 * 10 * 2.1), {
-                from: u1
-            });
-            await amm.createPool(toWad(10), {
-                from: u1
-            });
-            await amm.addWhitelisted(exchange.address);
+            await perpetual.deposit(toWad(7000 * 10 * 2.1), { from: u1 });
+            await amm.createPool(toWad(10), { from: u1 });
         });
 
         it("taker order is maker only", async () => {
@@ -214,9 +198,7 @@ contract('exchange-amm', accounts => {
         });
 
         it("invalid trading lot size", async () => {
-            await perpetual.deposit(toWad('87.67676767676767677'), {
-                from: u2
-            });
+            await perpetual.deposit(toWad('87.67676767676767677'), { from: u2 });
             await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
             const takerOrder = await buildOrder({
                 trader: u2,
@@ -294,7 +276,6 @@ contract('exchange-amm', accounts => {
             await amm.createPool(toWad(10), {
                 from: u1
             });
-            await amm.addWhitelisted(exchange.address);
         });
 
         it("buy", async () => {

@@ -35,13 +35,21 @@ contract Exchange {
         globalConfig = IGlobalConfig(_globalConfig);
     }
 
+    /**
+     * Match orders from one taker and multiple makers.
+     *
+     * @param takerOrderParam   Taker's order to match.
+     * @param makerOrderParams  Array of maker's order to match with.
+     * @param _perpetual        Address of perpetual contract.
+     * @param amounts           Array of matching amounts of each taker/maker pair. 
+     */
     function matchOrders(
         LibOrder.OrderParam memory takerOrderParam,
         LibOrder.OrderParam[] memory makerOrderParams,
         address _perpetual,
         uint256[] memory amounts
     ) public {
-        require(globalConfig.authorizedBrokers(msg.sender), "unauthorized broker");
+        require(globalConfig.brokers(msg.sender), "unauthorized broker");
         require(amounts.length > 0 && makerOrderParams.length == amounts.length, "no makers to match");
         require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
 
@@ -90,10 +98,89 @@ contract Exchange {
         filled[takerOrderHash] = takerFilledAmount;
     }
 
+    /**
+     * @dev Match orders from taker with amm. It is exactly same with directly trading from amm.
+     *
+     * @param takerOrderParam  Taker's order to match.
+     * @param _perpetual        Address of perpetual contract.
+     * @param amount           Amount to fiil.  
+     * @return Opened position amount of taker.
+     */
+    function matchOrderWithAMM(
+        LibOrder.OrderParam memory takerOrderParam,
+        address _perpetual,
+        uint256 amount
+    ) public {
+        require(globalConfig.brokers(msg.sender), "unauthorized broker");
+        require(amount >= 0, "invalid amount");
+        require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
+
+        IPerpetual perpetual = IPerpetual(_perpetual);
+        IAMM amm = IAMM(perpetual.amm());
+
+        bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
+        uint256 takerFilledAmount = filled[takerOrderHash];
+        require(amount <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
+
+        // trading with pool
+        uint256 takerOpened;
+        uint256 price = takerOrderParam.getPrice();
+        uint256 expired = takerOrderParam.expiredAt();
+        if (takerOrderParam.isSell()) {
+            takerOpened = amm.sellFromWhitelisted(
+                takerOrderParam.trader,
+                amount,
+                price,
+                expired
+            );
+        } else {
+            takerOpened = amm.buyFromWhitelisted(takerOrderParam.trader, amount, price, expired);
+        }
+        filled[takerOrderHash] = filled[takerOrderHash].add(amount);
+
+        emit MatchWithAMM(_perpetual, takerOrderParam, amount);
+    }
+
+    /**
+     * @dev Claim trading fee. Fee goes to brokers margin account.
+     *
+     * @param perpetual Address of perpetual contract.
+     * @param trader    Address of account who will pay fee out.
+     * @param fee       Amount of fee, decimals = 18.
+     */
+    function cancelOrder(LibOrder.Order memory order) public {
+        require(msg.sender == order.trader || msg.sender == order.broker, "invalid caller");
+
+        bytes32 orderHash = order.getOrderHash();
+        cancelled[orderHash] = true;
+
+        emit Cancel(orderHash);
+    }
+
+    /**
+     * @dev Get current chain id. need istanbul hardfork.
+     *
+     * @return Current chain id.
+     */
+    function getChainId() public pure returns (uint256 id) {
+        assembly {
+            id := chainid()
+        }
+    }
+
+    /**
+     * @dev Fill order between one taker and one maker.
+     *
+     * @param perpetual        Address of perpetual contract.
+     * @param takerOrderParam  Taker's order to match.
+     * @param takerOrderParam  Maker's order to match.
+     * @param amount           Amount to fiil.  
+     * @return Opened position amount of taker.
+     */
     function fillOrder(
         IPerpetual perpetual,
         LibOrder.OrderParam memory takerOrderParam,
-        LibOrder.OrderParam memory makerOrderParam,
+        LibOrder.OrderParam memory takerOrderParam,
         uint256 amount
     ) internal returns (uint256) {
         uint256 price = makerOrderParam.getPrice();
@@ -125,41 +212,13 @@ contract Exchange {
         return takerOpened;
     }
 
-    function matchOrderWithAMM(
-        LibOrder.OrderParam memory takerOrderParam,
-        address _perpetual,
-        uint256 amount
-    ) public {
-        require(globalConfig.authorizedBrokers(msg.sender), "unauthorized broker");
-        require(amount >= 0, "invalid amount");
-        require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
-
-        IPerpetual perpetual = IPerpetual(_perpetual);
-        IAMM amm = IAMM(perpetual.amm());
-
-        bytes32 takerOrderHash = validateOrderParam(perpetual, takerOrderParam);
-        uint256 takerFilledAmount = filled[takerOrderHash];
-        require(amount <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
-
-        // trading with pool
-        uint256 takerOpened;
-        uint256 price = takerOrderParam.getPrice();
-        uint256 expired = takerOrderParam.expiredAt();
-        if (takerOrderParam.isSell()) {
-            takerOpened = amm.sellFromWhitelisted(
-                takerOrderParam.trader,
-                amount,
-                price,
-                expired
-            );
-        } else {
-            takerOpened = amm.buyFromWhitelisted(takerOrderParam.trader, amount, price, expired);
-        }
-        filled[takerOrderHash] = filled[takerOrderHash].add(amount);
-
-        emit MatchWithAMM(_perpetual, takerOrderParam, amount);
-    }
-
+    /**
+     * @dev Check price in both side is meet.
+     *
+     * @param takerOrderParam  Taker's order.
+     * @param takerOrderParam  Maker's order.
+     * @return Opened position amount of taker.
+     */
     function validatePrice(LibOrder.OrderParam memory takerOrderParam, LibOrder.OrderParam memory makerOrderParam)
         internal
         pure
@@ -172,12 +231,14 @@ contract Exchange {
         require(takerOrderParam.isSell() ? takerPrice <= makerPrice : takerPrice >= makerPrice, "price not match");
     }
 
-    function getChainId() public pure returns (uint256 id) {
-        assembly {
-            id := chainid()
-        }
-    }
 
+    /**
+     * @dev Validate order.
+     *
+     * @param perpetual        Instance of perpetual contract.
+     * @param takerOrderParam  An order.
+     * @return Valid order hash.
+     */
     function validateOrderParam(IPerpetual perpetual, LibOrder.OrderParam memory orderParam)
         internal
         view
@@ -195,35 +256,50 @@ contract Exchange {
         return orderHash;
     }
 
+    /**
+     * @dev Claim trading fee. Fee goes to brokers margin account.
+     *
+     * @param perpetual Address of perpetual contract.
+     * @param trader    Address of account who will pay fee out.
+     * @param fee       Amount of fee, decimals = 18.
+     */
     function claimTradingFee(
         IPerpetual perpetual,
         address trader,
         int256 fee
-    ) internal {
+    ) 
+        internal 
+    {
         if (fee > 0) {
             perpetual.transferCashBalance(trader, msg.sender, fee.toUint256());
         } else if (fee < 0) {
             perpetual.transferCashBalance(msg.sender, trader, fee.neg().toUint256());
         }
     }
-
-    function cancelOrder(LibOrder.Order memory order) public {
-        require(msg.sender == order.broker, "invalid caller");
-
-        bytes32 orderHash = order.getOrderHash();
-        cancelled[orderHash] = true;
-
-        emit Cancel(orderHash);
-    }
-
+        
+        
+    /**
+     * @dev Claim dev fee. Fee to open positions cannot be avoid.
+     *      But for closing position, the fee will be ignored if there is not enough
+     *      cash balance.
+     *
+     * @param perpetual     Address of perpetual.
+     * @param trader        Address of margin account.
+     * @param price         Price of position.
+     * @param openedAmount  Opened position amount.
+     * @param closedAmount  Closed position amount.
+     * @param feeRate       Maker's order.
+     */
     function claimDevFee(
         IPerpetual perpetual,
-        address guy,
+        address trader,
         uint256 price,
         uint256 openedAmount,
         uint256 closedAmount,
         int256 feeRate
-    ) internal {
+    ) 
+        internal
+    {
         if (feeRate == 0) {
             return;
         }
@@ -232,35 +308,57 @@ contract Exchange {
         int256 fee = hard.add(soft);
         address devAddress = perpetual.devAddress();
         if (fee > 0) {
-            int256 available = perpetual.availableMargin(guy);
+            int256 available = perpetual.availableMargin(trader);
             require(available >= hard, "dev margin");
             fee = fee.min(available);
-            perpetual.transferCashBalance(guy, devAddress, fee.toUint256());
+            perpetual.transferCashBalance(trader, devAddress, fee.toUint256());
         } else if (fee < 0) {
-            perpetual.transferCashBalance(devAddress, guy, fee.neg().toUint256());
+            perpetual.transferCashBalance(devAddress, trader, fee.neg().toUint256());
             require(perpetual.isSafe(devAddress), "dev unsafe");
         }
     }
 
+    /**
+     * @dev Claim dev fee in taker fee rate set by pereptual governacne.
+     *
+     * @param perpetual     Address of perpetual.
+     * @param trader        Taker's order.
+     * @param price         Maker's order.
+     * @param openedAmount  Maker's order.
+     * @param closedAmount  Maker's order.
+     */
     function claimTakerDevFee(
         IPerpetual perpetual,
-        address guy,
+        address trader,
         uint256 price,
         uint256 openedAmount,
         uint256 closedAmount
-    ) internal {
+    ) 
+        internal 
+    {
         int256 rate = perpetual.getGovernance().takerDevFeeRate;
-        claimDevFee(perpetual, guy, price, openedAmount, closedAmount, rate);
+        claimDevFee(perpetual, trader, price, openedAmount, closedAmount, rate);
     }
 
+    /**
+     * @dev Claim dev fee in maker fee rate set by pereptual governacne.
+     *
+     * @param perpetual     Address of perpetual.
+     * @param trader        Taker's order.
+     * @param price         Maker's order.
+     * @param openedAmount  Maker's order.
+     * @param closedAmount  Maker's order.
+     */
     function claimMakerDevFee(
         IPerpetual perpetual,
-        address guy,
+        address trader,
         uint256 price,
         uint256 openedAmount,
         uint256 closedAmount
-    ) internal {
+    ) 
+        internal 
+    {
         int256 rate = perpetual.getGovernance().makerDevFeeRate;
-        claimDevFee(perpetual, guy, price, openedAmount, closedAmount, rate);
+        claimDevFee(perpetual, trader, price, openedAmount, closedAmount, rate);
     }
 }

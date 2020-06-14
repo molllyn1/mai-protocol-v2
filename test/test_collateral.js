@@ -5,6 +5,7 @@ const { toWad, fromWad, infinity } = require('./constants');
 
 const TestToken = artifacts.require('test/TestToken.sol');
 const TestCollateral = artifacts.require('test/TestCollateral.sol');
+const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 
 contract('TestCollateral', accounts => {
 
@@ -27,14 +28,9 @@ contract('TestCollateral', accounts => {
     };
 
     const deploy = async (cDecimals = 18) => {
+        globalConfig = await GlobalConfig.new();
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
-        vault = await TestCollateral.new(collateral.address, cDecimals);
-    };
-
-    const increaseBlockBy = async (n) => {
-        for (let i = 0; i < n; i++) {
-            await increaseEvmBlock();
-        }
+        vault = await TestCollateral.new(globalConfig.address, collateral.address, cDecimals);
     };
 
     const cashBalanceOf = async (user) => {
@@ -47,16 +43,16 @@ contract('TestCollateral', accounts => {
 
         it ("constructor - invalid decimals", async () => {
             try {
-                const col = await TestCollateral.new("0x0000000000000000000000000000000000000000", 17);
+                const col = await TestCollateral.new(globalConfig.address, "0x0000000000000000000000000000000000000000", 17);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid decimals"));
+                assert.ok(error.message.includes("invalid decimals"), error);
             }
         });
 
         it ("constructor - decimals out of range", async () => {
             try {
-                const col = await TestCollateral.new("0x0000000000000000000000000000000000000000", 19);
+                const col = await TestCollateral.new(globalConfig.address, "0x0000000000000000000000000000000000000000", 19);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("decimals out of range"));
@@ -65,7 +61,7 @@ contract('TestCollateral', accounts => {
 
         it ("constructor - decimals out of range", async () => {
             try {
-                const col = await TestCollateral.new("0x0000000000000000000000000000000000000000", -1);
+                const col = await TestCollateral.new(globalConfig.address, "0x0000000000000000000000000000000000000000", -1);
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("decimals out of range"));
@@ -75,7 +71,7 @@ contract('TestCollateral', accounts => {
 
     describe("deposit / withdraw - ether", async () => {
         beforeEach(async () => {
-            vault = await TestCollateral.new("0x0000000000000000000000000000000000000000", 18);
+            vault = await TestCollateral.new(globalConfig.address, "0x0000000000000000000000000000000000000000", 18);
         });
 
         it('isTokenizedCollateral', async () => {

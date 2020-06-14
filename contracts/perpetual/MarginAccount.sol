@@ -20,9 +20,9 @@ contract MarginAccount is Collateral {
     event Transfer(address indexed from, address indexed to, int256 wadAmount, int256 balanceFrom, int256 balanceTo);
     event InternalUpdateBalance(address indexed trader, int256 wadAmount, int256 balance);
 
-    constructor(address _collateral, uint256 _collateralDecimals)
+    constructor(address _globalConfig, address _collateral, uint256 _collateralDecimals)
         public
-        Collateral(_collateral, _collateralDecimals)
+        Collateral(_globalConfig, _collateral, _collateralDecimals)
     {}
 
     /**

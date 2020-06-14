@@ -59,12 +59,12 @@ contract('amm-eth', accounts => {
             decimals
         );
         proxy = await Proxy.new(perpetual.address);
-        amm = await AMM.new(proxy.address, priceFeeder.address, share.address);
+        amm = await AMM.new(globalConfig.address, proxy.address, priceFeeder.address, share.address);
         await share.addMinter(amm.address);
         await share.renounceMinter();
 
         await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
-        await perpetual.addWhitelisted(proxy.address);
+        await globalConfig.addComponent(perpetual.address, proxy.address);
     };
 
     const useDefaultGovParameters = async () => {

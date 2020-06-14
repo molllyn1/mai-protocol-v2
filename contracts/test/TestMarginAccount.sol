@@ -5,7 +5,10 @@ import "../perpetual/MarginAccount.sol";
 
 
 contract TestMarginAccount is MarginAccount {
-    constructor(address _collateral, uint256 _decimals) public MarginAccount(_collateral, _decimals) {}
+    constructor(address _globalConfig, address _collateral, uint256 _decimals) 
+        public 
+        MarginAccount(_globalConfig, _collateral, _decimals) 
+    {}
 
     function marginBalanceWithPricePublic(address guy, uint256 markPrice) public returns (int256) {
         return marginBalanceWithPrice(guy, markPrice);

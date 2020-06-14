@@ -29,7 +29,7 @@ contract('exchange-user', accounts => {
     const LONG = 2;
 
     let collateral;
-    let global;
+    let globalConfig;
     let funding;
     let perpetual;
     let exchange;
@@ -60,21 +60,19 @@ contract('exchange-user', accounts => {
 
     const deploy = async (cDecimals = 18, pDecimals = 18) => {
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
-        global = await GlobalConfig.new();
+        globalConfig = await GlobalConfig.new();
         funding = await TestFundingMock.new();
-        exchange = await Exchange.new(global.address);
+        exchange = await Exchange.new(globalConfig.address);
         perpetual = await Perpetual.new(
-            global.address,
+            globalConfig.address,
             dev,
             collateral.address,
             cDecimals
         );
         await perpetual.setGovernanceAddress(toBytes32("amm"), funding.address);
 
-        await perpetual.addWhitelisted(exchange.address);
-        await perpetual.addWhitelisted(admin);
-
-        await global.addAuthorizedBroker(admin);
+        await globalConfig.addBroker(admin);
+        await globalConfig.addComponent(perpetual.address, exchange.address);
     };
 
     const setDefaultGovParameters = async () => {
@@ -1914,7 +1912,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, u3);
 
-            await global.addAuthorizedBroker(u3);
+            await globalConfig.addBroker(u3);
             await exchange.matchOrders(
                 takerParam,
                 [makerParam],
@@ -1988,7 +1986,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, u3);
 
-            await global.addAuthorizedBroker(u3);
+            await globalConfig.addBroker(u3);
             try {
                 await exchange.matchOrders(
                     takerParam,
@@ -2056,7 +2054,7 @@ contract('exchange-user', accounts => {
                 salt: 666,
             }, perpetual.address, u3);
 
-            await global.addAuthorizedBroker(u3);
+            await globalConfig.addBroker(u3);
             try {
                 await exchange.matchOrders(
                     takerParam,
@@ -2150,7 +2148,7 @@ contract('exchange-user', accounts => {
                 assert.ok(error.message.includes("order expired"), error);
             }
 
-            await global.addAuthorizedBroker(u3);
+            await globalConfig.addBroker(u3);
             try {
                 let tp = copy(takerParam);
                 let mp = copy(makerParam);

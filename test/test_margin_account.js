@@ -13,6 +13,7 @@ const {
 const TestToken = artifacts.require('test/TestToken.sol');
 const TestMarginAccount = artifacts.require('test/TestMarginAccount.sol');
 const TestFundingMock = artifacts.require('test/TestFundingMock.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 
 contract('TestMarginAccount', accounts => {
 
@@ -40,16 +41,11 @@ contract('TestMarginAccount', accounts => {
     };
 
     const deploy = async (cDecimals = 18, pDecimals = 18) => {
+        globalConfig = await GlobalConfig.new();
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
-        marginAccount = await TestMarginAccount.new(collateral.address, cDecimals);
+        marginAccount = await TestMarginAccount.new(globalConfig.address, collateral.address, cDecimals);
         funding = await TestFundingMock.new();
         await marginAccount.setGovernanceAddress(toBytes32("amm"), funding.address);
-    };
-
-    const increaseBlockBy = async (n) => {
-        for (let i = 0; i < n; i++) {
-            await increaseEvmBlock();
-        }
     };
 
     const setDefaultGovParameters = async () => {

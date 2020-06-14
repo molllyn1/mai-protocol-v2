@@ -19,7 +19,7 @@ const {
 
 const TestToken = artifacts.require('test/TestToken.sol');
 const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
-const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 const Perpetual = artifacts.require('test/TestPerpetual.sol');
 const AMM = artifacts.require('test/TestAMM.sol');
 const Proxy = artifacts.require('proxy/Proxy.sol');
@@ -73,12 +73,12 @@ contract('amm', accounts => {
             18
         );
         proxy = await Proxy.new(perpetual.address);
-        amm = await AMM.new(proxy.address, priceFeeder.address, share.address);
+        amm = await AMM.new(globalConfig.address, proxy.address, priceFeeder.address, share.address);
         await share.addMinter(amm.address);
         await share.renounceMinter();
 
         await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
-        await perpetual.addWhitelisted(proxy.address);
+        await globalConfig.addComponent(perpetual.address, proxy.address);
     };
 
     const useDefaultGovParameters = async () => {
@@ -103,7 +103,6 @@ contract('amm', accounts => {
 
     const setIndexPrice = async price => {
         await priceFeeder.setPrice(toWad(price));
-
         // priceFeeder will modify index.timestamp, amm.timestamp should >= index.timestamp
         const index = await amm.indexPrice();
         await amm.setBlockTimestamp(index.timestamp);
@@ -1198,8 +1197,6 @@ contract('amm', accounts => {
             await collateral.approve(perpetual.address, infinity, {
                 from: u2
             });
-            await setBroker(u2, proxy.address);
-
             // create amm
             await perpetual.deposit(toWad(7000 * 100 * 2.1), {
                 from: u1

@@ -4,27 +4,39 @@ pragma experimental ABIEncoderV2; // to enable structure-type parameter
 import "../lib/LibMath.sol";
 import "../lib/LibTypes.sol";
 import "./PerpetualStorage.sol";
-
+import "../interface/IGlobalConfig.sol";
 
 contract PerpetualGovernance is PerpetualStorage {
-    event EnterEmergencyStatus();
-    event EnterSettledStatus();
+
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
     event UpdateGovernanceAddress(bytes32 indexed key, address value);
 
-    // Modifier to check if amm address is set.
+    constructor(address _globalConfig) public {
+        require(_globalConfig != address(0), "invalid global config");
+        globalConfig = IGlobalConfig(_globalConfig);
+    }
+
+    // Check if amm address is set.
     modifier ammRequired() {
         require(address(amm) != address(0), "no automated market maker");
         _;
     }
 
+    // Check if sender is owner.
     modifier onlyOwner() {
         require(globalConfig.owner() == msg.sender, "not owner");
         _;
     }
 
+    // Check if sender is authorized to call some critical functions.
     modifier onlyAuthorized() {
-        require(globalConfig.isAuthorizedComponent(msg.sender), "unauthorized caller");
+        require(globalConfig.isComponent(msg.sender), "unauthorized caller");
+        _;
+    }
+
+    // Check if system is current paused. 
+    modifier onlyNotPaused () {
+        require(!paused, "system paused");
         _;
     }
 
@@ -95,24 +107,6 @@ contract PerpetualGovernance is PerpetualStorage {
             revert("key not exists");
         }
         emit UpdateGovernanceAddress(key, value);
-    }
-
-    /**
-     * @dev Set status to EMERGENCY.
-     */
-    function setSettledStatus() internal {
-        require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
-        status = LibTypes.Status.SETTLED;
-        emit EnterSettledStatus();
-    }
-
-    /**
-     * @dev Set status to SETTLED.
-     */
-    function setEmergencyStatus() internal {
-        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
-        status = LibTypes.Status.EMERGENCY;
-        emit EnterEmergencyStatus();
     }
 
     /** 

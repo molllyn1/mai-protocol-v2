@@ -20,7 +20,7 @@ contract('exchange-user-reverse', accounts => {
 
     let priceFeeder;
     let collateral;
-    let global;
+    let globalConfig;
     let funding;
     let perpetual;
     let exchange;
@@ -46,36 +46,27 @@ contract('exchange-user-reverse', accounts => {
         u4,
     };
 
-    const increaseBlockBy = async (n) => {
-        for (let i = 0; i < n; i++) {
-            await increaseEvmBlock();
-        }
-    };
-
     const deploy = async (cDecimals = 18, pDecimals = 18) => {
         priceFeeder = await PriceFeeder.new();
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
-        global = await GlobalConfig.new();
+        globalConfig = await GlobalConfig.new();
         funding = await TestFundingMock.new();
-        exchange = await Exchange.new(global.address);
+        exchange = await Exchange.new(globalConfig.address);
         perpetual = await Perpetual.new(
-            global.address,
+            globalConfig.address,
             dev,
             collateral.address,
             cDecimals
         );
         share = await ShareToken.new("ST", "STK", 18);
         proxy = await Proxy.new(perpetual.address);
-        amm = await AMM.new(proxy.address, priceFeeder.address, share.address);
+        amm = await AMM.new(globalConfig.address, proxy.address, priceFeeder.address, share.address);
         await share.addMinter(amm.address);
         await share.renounceMinter();
         await perpetual.setGovernanceAddress(toBytes32("amm"), funding.address);
-        await perpetual.addWhitelisted(proxy.address);
 
-        await perpetual.addWhitelisted(exchange.address);
-        await perpetual.addWhitelisted(admin);
-
-        await global.addAuthorizedBroker(admin);
+        await globalConfig.addBroker(admin);
+        await globalConfig.addComponent(perpetual.address, exchange.address);
     };
 
     const setDefaultGovParameters = async () => {

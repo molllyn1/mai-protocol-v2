@@ -19,10 +19,16 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
     mapping(address => bool) private accountCreated;
 
     event CreatePerpetual();
+    event Paused(address indexed caller);
+    event Unpaused(address indexed caller);
+    event DisableWithdraw(address indexed caller);
+    event EnableWithdraw(address indexed caller);
     event CreateAccount(uint256 indexed id, address indexed trader);
     event Trade(address indexed taker, address indexed maker, LibTypes.Side side, uint256 price, uint256 amount);
     event Liquidate(address indexed keeper, address indexed trader, uint256 price, uint256 amount);
     event UpdateSettlementPrice(uint256 price);
+    event EnterEmergencyStatus(uint256 price);
+    event EnterSettledStatus(uint256 price);
 
     constructor(
         address _globalConfig,
@@ -31,15 +37,9 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         uint256 _collateralDecimals
     ) 
         public 
-        MarginAccount(_collateral, _collateralDecimals) 
+        MarginAccount(_globalConfig, _collateral, _collateralDecimals)
     {
-
-        globalConfig = _globalConfig;
         devAddress = _devAddress;
-
-        // setGovernanceAddress("globalConfig", _globalConfig);
-        // setGovernanceAddress("dev", _devAddress);
-
         emit CreatePerpetual();
     }
 
@@ -48,7 +48,58 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         revert("no payable");
     }
 
-    // Admin functions
+    /**
+     * @dev Called by a pauseControllers, put whole system into paused state.
+     */
+    function pause() external {
+        require(
+            globalConfig.pauseControllers(msg.sender) || globalConfig.owner() == msg.sender,
+            "unauthorized caller"
+        );
+        require(!paused, "already paused");
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    /**
+     * @dev Called by a pauseControllers, put whole system back to normal.
+     */
+    function unpause() external {
+        require(
+            globalConfig.pauseControllers(msg.sender) || globalConfig.owner() == msg.sender,
+            "unauthorized caller"
+        );
+        require(paused, "not paused");
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    /**
+     * @dev Called by a withdrawControllers disable withdraw function.
+     */
+    function disableWithdraw() external {
+        require(
+            globalConfig.withdrawControllers(msg.sender) || globalConfig.owner() == msg.sender,
+            "unauthorized caller"
+        );
+        require(!withdrawDisabled, "already disabled");
+        withdrawDisabled = true;
+        emit DisableWithdraw(msg.sender);
+    }
+
+    /**
+     * @dev Called by a withdrawControllers, enable withdraw function again.
+     */
+    function enableWithdraw() external {
+        require(
+            globalConfig.withdrawControllers(msg.sender) || globalConfig.owner() == msg.sender, 
+            "unauthorized caller"
+        );
+        require(withdrawDisabled, "not disabled");
+        withdrawDisabled = false;
+        emit EnableWithdraw(msg.sender);
+    }
+
     /**
      * @notice Force to set cash balance of margin account. Called by administrator to
      *      fix unexpected cash balance.
@@ -56,7 +107,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader Address of account owner.
      * @param amount Absolute cash balance value to be set.
      */
-    function setCashBalance(address trader, int256 amount) public onlyOwner {
+    function setCashBalance(address trader, int256 amount) external onlyOwner {
         require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
         int256 deltaAmount = amount.sub(marginAccounts[trader].cashBalance);
         marginAccounts[trader].cashBalance = amount;
@@ -69,10 +120,12 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param price Price used as mark price in emergency mode.
      */
-    function beginGlobalSettlement(uint256 price) public onlyOwner {
-        setEmergencyStatus();
+    function beginGlobalSettlement(uint256 price) external onlyOwner {
+        require(status != LibTypes.Status.SETTLED, "wrong perpetual status");
+        status = LibTypes.Status.EMERGENCY;
+
         settlementPrice = price;
-        emit UpdateSettlementPrice(price);
+        emit EnterEmergencyStatus(price);
     }
 
     /**
@@ -80,10 +133,13 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *         In settled mode, user is expected to closed positions and withdraw all the collateral.
      * @notice endGlobalSettlement will also settle all postition belongs to amm.
      */
-    function endGlobalSettlement() public onlyOwner {
-        setSettledStatus();
+    function endGlobalSettlement() external onlyOwner {
+        require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
+        status = LibTypes.Status.SETTLED;
+
         address ammTrader = address(amm.perpetualProxy());
         settleImplementation(ammTrader);
+        emit EnterSettledStatus(settlementPrice);
     }
 
     /**
@@ -92,7 +148,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param rawAmount Amount to deposit.
      */
-    function depositToInsuranceFund(uint256 rawAmount) public payable nonReentrant {
+    function depositToInsuranceFund(uint256 rawAmount) external payable nonReentrant {
         checkDepositingParameter(rawAmount);
 
         require(rawAmount > 0, "invalid amount");
@@ -108,7 +164,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param rawAmount Amount to withdraw.
      */
-    function withdrawFromInsuranceFund(uint256 rawAmount) public onlyOwner nonReentrant {
+    function withdrawFromInsuranceFund(uint256 rawAmount) external onlyOwner nonReentrant {
         require(rawAmount > 0, "invalid amount");
         require(insuranceFundBalance > 0, "insufficient funds");
 
@@ -132,7 +188,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param rawAmount Amount to deposit.
      */
-    function deposit(uint256 rawAmount) public payable nonReentrant {
+    function deposit(uint256 rawAmount) external payable nonReentrant {
         depositImplementation(msg.sender, rawAmount);
     }
 
@@ -141,7 +197,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param rawAmount Amount to withdraw.
      */
-    function withdraw(uint256 rawAmount) public nonReentrant {
+    function withdraw(uint256 rawAmount) external nonReentrant {
         withdrawImplementation(msg.sender, rawAmount);
     }
 
@@ -149,7 +205,8 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @notice Close all position and withdraw all collateral remaining in sender's margin account.
      *         Settle is only available in settled state and can be called multiple times.
      */
-    function settle() public nonReentrant {
+    function settle() external nonReentrant 
+    {
         address payable trader = msg.sender;
         settleImplementation(trader);
         int256 wadAmount = marginAccounts[trader].cashBalance;
@@ -171,7 +228,12 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address of margin account to deposit into.
      * @param rawAmount Amount of collateral to deposit.
      */
-    function depositFor(address trader, uint256 rawAmount) public payable onlyAuthorized nonReentrant {
+    function depositFor(address trader, uint256 rawAmount) 
+        external 
+        payable 
+        onlyAuthorized 
+        nonReentrant 
+    {
         depositImplementation(trader, rawAmount);
     }
 
@@ -183,7 +245,11 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address of margin account to deposit into.
      * @param rawAmount Amount of collateral to deposit.
      */
-    function withdrawFor(address payable trader, uint256 rawAmount) public onlyAuthorized nonReentrant {
+    function withdrawFor(address payable trader, uint256 rawAmount) 
+        external 
+        onlyAuthorized 
+        nonReentrant 
+    {
         withdrawImplementation(trader, rawAmount);
     }
 
@@ -326,7 +392,8 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         address trader, 
         uint256 maxAmount
     ) 
-        public 
+        public
+        onlyNotPaused
         returns (uint256, uint256) 
     {
         require(msg.sender != trader, "self liquidate");
@@ -360,7 +427,8 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         uint256 price,
         uint256 amount
     ) 
-        public 
+        public
+        onlyNotPaused
         onlyAuthorized 
         returns (uint256 takerOpened, uint256 makerOpened) 
     {
@@ -379,7 +447,11 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         address from,
         address to,
         uint256 amount
-    ) public onlyAuthorized {
+    ) 
+        public 
+        onlyNotPaused
+        onlyAuthorized 
+    {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         MarginAccount.transferBalance(from, to, amount.toInt256());
     }
@@ -407,7 +479,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address the collateral will be transferred from.
      * @param rawAmount Amount to deposit.
      */
-    function depositImplementation(address trader, uint256 rawAmount) internal {
+    function depositImplementation(address trader, uint256 rawAmount) internal onlyNotPaused {
         checkDepositingParameter(rawAmount);
         require(rawAmount > 0, "invalid amount");
         require(trader != address(0), "invalid trader");
@@ -425,7 +497,8 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address the collateral will be transferred to.
      * @param rawAmount Amount to withdraw.
      */
-    function withdrawImplementation(address payable trader, uint256 rawAmount) internal {
+    function withdrawImplementation(address payable trader, uint256 rawAmount) internal onlyNotPaused {
+        require(!withdrawDisabled, "withdraw disabled");
         require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(rawAmount > 0, "invalid amount");
         require(trader != address(0), "invalid trader");
@@ -445,7 +518,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param trader    Address the collateral will be transferred to.
      */
-    function settleImplementation(address trader) internal {
+    function settleImplementation(address trader) internal onlyNotPaused {
         require(status == LibTypes.Status.SETTLED, "wrong perpetual status");
         uint256 currentMarkPrice = markPrice();
         LibTypes.MarginAccount memory account = marginAccounts[trader];

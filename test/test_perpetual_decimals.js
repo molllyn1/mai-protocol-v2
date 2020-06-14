@@ -118,19 +118,17 @@ contract('TestPerpetual', accounts => {
             }
             await deploy(i);
 
-            await collateral.transfer(u1, _unit(10));
-            await collateral.approve(perpetual.address,  infinity, { from: u1 });
+            const initialBalance = await collateral.balanceOf(admin);
+            await collateral.approve(perpetual.address,  infinity, { from: admin });
 
             assert.equal(await perpetual.insuranceFundBalance(), toWad(0));
-            await perpetual.depositToInsuranceFund(_unit(10), { from: u1 });
+            await perpetual.depositToInsuranceFund(_unit(10), { from: admin });
             assert.equal(await perpetual.insuranceFundBalance(), toWad(10));
             console.log("   deposit ", _unit(10));
             console.log("  internal ", toWad(10));
-
-            await perpetual.addWhitelistAdmin(u1);
-            await perpetual.withdrawFromInsuranceFund(_unit(10), { from: u1 });
+            await perpetual.withdrawFromInsuranceFund(_unit(10), { from: admin });
             assert.equal(await perpetual.insuranceFundBalance(), toWad(0));
-            assert.equal(await collateral.balanceOf(u1), _unit(10));
+            assert.equal(fromWad(await collateral.balanceOf(admin)), fromWad(initialBalance));
         }
 
 

@@ -17,7 +17,7 @@ contract('TestExtension', accounts => {
     const LONG = 2;
 
     let collateral;
-    let global;
+    let globalConfig;
     let perpetual;
 
     const broker = accounts[9];
@@ -55,9 +55,9 @@ contract('TestExtension', accounts => {
 
     const deploy = async (cDecimals = 18) => {
         collateral = await TestToken.new("TT", "TestToken", cDecimals);
-        global = await GlobalConfig.new();
+        globalConfig = await GlobalConfig.new();
         perpetual = await TestPerpetual.new(
-            global.address,
+            globalConfig.address,
             dev,
             collateral.address,
             cDecimals
@@ -82,7 +82,8 @@ contract('TestExtension', accounts => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
 
-            await perpetual.addWhitelisted(admin);
+            await globalConfig.addComponent(perpetual.address, admin);
+
             await perpetual.depositFor(u1, toWad(1000));
 
             await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
@@ -112,7 +113,7 @@ contract('TestExtension', accounts => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(perpetual.address, infinity, { from: u1 });
 
-            await perpetual.addWhitelisted(admin);
+            await globalConfig.addComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
             let funding7k = await TestFundingMock.new();
@@ -151,7 +152,7 @@ contract('TestExtension', accounts => {
 
         //     await collateral.transfer(u1, toWad(10000));
         //     await collateral.approve(perpetual.address, infinity, { from: u1 });
-        //     await perpetual.addWhitelisted(admin);
+        //     await globalConfig.addComponent(perpetual.address, admin);
 
         //     await perpetual.depositFor(u1, toWad(1000));
         //     // 1%

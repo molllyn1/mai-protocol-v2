@@ -5,16 +5,15 @@ import "../perpetual/PerpetualGovernance.sol";
 
 
 contract TestPerpGovernance is PerpetualGovernance {
+
+    constructor(address _globalConfig) 
+        public
+        PerpetualGovernance(_globalConfig) 
+    {
+    } 
+
     function testAmmRequired() public view ammRequired returns (uint256) {
         return 1;
-    }
-
-    function setEmergencyStatusPublic() public {
-        setEmergencyStatus();
-    }
-
-    function setSettledStatusPublic() public {
-        setSettledStatus();
     }
 }
 

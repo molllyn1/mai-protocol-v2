@@ -70,12 +70,12 @@ contract('statement', accounts => {
             18
         );
         proxy = await Proxy.new(perpetual.address);
-        amm = await AMM.new(proxy.address, priceFeeder.address, share.address);
+        amm = await AMM.new(globalConfig.address, proxy.address, priceFeeder.address, share.address);
         await share.addMinter(amm.address);
         await share.renounceMinter();
 
         await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
-        await perpetual.addWhitelisted(proxy.address);
+        await globalConfig.addComponent(perpetual.address, proxy.address);
     };
 
 
@@ -169,8 +169,9 @@ contract('statement', accounts => {
             from: u1
         });
 
-        await amm.addWhitelisted(admin);
-        await perpetual.addWhitelisted(admin);
+        await globalConfig.addBroker(admin);
+        await globalConfig.addComponent(amm.address, admin);
+        await globalConfig.addComponent(perpetual.address, admin);
     });
 
 
@@ -256,7 +257,7 @@ contract('statement', accounts => {
             await perpetual.setCashBalance(u2, toWad(998, cash), {from: u2});
             throw null;
         } catch (error) {
-            assert.ok(error.message.includes("caller does not have the WhitelistAdmin role"))
+            assert.ok(error.message.includes("not owner"))
         }
         await perpetual.setCashBalance(u2, toWad(998, cash));
         await perpetual.endGlobalSettlement();

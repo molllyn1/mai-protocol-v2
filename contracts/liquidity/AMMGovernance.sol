@@ -27,13 +27,18 @@ contract AMMGovernance {
 
     event UpdateGovernanceParameter(bytes32 indexed key, int256 value);
 
+    constructor(address _globalConfig) public {
+        require(_globalConfig != address(0), "invalid global config");
+        globalConfig = IGlobalConfig(_globalConfig);
+    }
+
     modifier onlyOwner() {
         require(globalConfig.owner() == msg.sender, "not owner");
         _;
     }
 
     modifier onlyAuthorized() {
-        require(globalConfig.isAuthorizedComponent(msg.sender), "unauthorized caller");
+        require(globalConfig.isComponent(msg.sender), "unauthorized caller");
         _;
     }
 

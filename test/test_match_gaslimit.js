@@ -76,9 +76,6 @@ function formatOrder(param) {
 //     console.log(await perpetual.currentBroker(u5));
 //     console.log(await perpetual.currentBroker(u6));
 
-//     // await perpetual.setBroker(broker, { from: u5 });
-//     // await perpetual.setBroker(broker, { from: u6 });
-
 //     // await perpetual.depositEther({ value: toWad("5"), from: u5 });
 //     // await perpetual.depositEther({ value: toWad("5"), from: u6 });
 
