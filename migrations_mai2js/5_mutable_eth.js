@@ -6,7 +6,7 @@ const ShareToken = artifacts.require('token/ShareToken.sol');
 const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const AMM = artifacts.require('liquidity/AMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
 
 const toBytes32 = s => {
@@ -37,8 +37,6 @@ module.exports = async function (deployer, network, accounts) {
     const shareToken = await ShareToken.deployed();
 
     console.log('default gov...');
-    await globalConfig.setGlobalParameter(toBytes32("withdrawalLockBlockCount"), 5);
-    await globalConfig.setGlobalParameter(toBytes32("brokerLockBlockCount"), 5);
 
     await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.10)); // 10%, should < 1
     await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05)); // 5%, should < initialMarginRate

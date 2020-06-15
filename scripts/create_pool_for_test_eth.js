@@ -4,20 +4,20 @@ const { toWei, fromWei, toWad, fromWad, infinity, Side } = require('../test/cons
 const Perpetual = artifacts.require('Perpetual');
 const AMM = artifacts.require('AMM');
 
-const deposit = async (from, amount, brokerAddress) => {
+const deposit = async (from, amount) => {
     const balance = new BigNumber(await web3.eth.getBalance(from));
     if (balance.lt(amount)) {
-        throw Error('insufficent ETH. check ganache parameters');
+        throw Error('insufficient ETH. check ganache parameters');
     }
 
     const perpetual = await Perpetual.at(perpetualAddress);
-    const cashBalance = await perpetual.getCashBalance(from);
-    console.log('cash', cashBalance.balance);
-    if (new BigNumber(cashBalance.balance).gte(amount)) {
+    const account = await perpetual.getMarginAccount(from);
+    console.log('cashBalance', account.cashBalance);
+    if (new BigNumber(account.balance).gte(amount)) {
         console.log('skip deposit');
         return;
     }
-    await perpetual.depositEtherAndSetBroker(brokerAddress, { from, value: amount, gas: 1000000 });
+    await perpetual.deposit(amount, { from, value: amount, gas: 1000000 });
     console.log('deposit done');
 };
 
@@ -30,8 +30,8 @@ const createPool = async (from, ammAddress) => {
 const main = async () => {
     const addresses = await web3.eth.getAccounts();
     const me = addresses[0];
-    const { ammAddress, proxyAddress } = await readPerpAddress(Perpetual, AMM, perpetualAddress);
-    await deposit(me, toWad(100 * 0.0062 * 2 * 1.5), proxyAddress);
+    const { ammAddress } = await readPerpAddress(Perpetual, AMM, perpetualAddress);
+    await deposit(me, toWad(100 * 0.0062 * 2 * 1.5));
     await createPool(me, ammAddress);
     console.log('jobs done');
 };
