@@ -457,16 +457,10 @@ contract('amm', accounts => {
         });
 
         it("removeLiquidity - transfer share", async () => {
-            await perpetual.deposit(toWad(7000 * 3), {
-                from: u2
-            });
-            await amm.addLiquidity(toWad(1), {
-                from: u2
-            });
+            await perpetual.deposit(toWad(7000 * 3), { from: u2 });
+            await amm.addLiquidity(toWad(1), { from: u2 });
 
-            await perpetual.deposit(toWad(7000 * 3), {
-                from: u3
-            });
+            await perpetual.deposit(toWad(7000 * 3), { from: u3 });
 
             assert.equal(fromWad(await cashBalanceOf(u2)), 7000);
             assert.equal(fromWad(await share.balanceOf(u2)), 1);
@@ -482,18 +476,14 @@ contract('amm', accounts => {
             assert.equal(await share.balanceOf(u3), toWad(1));
 
             try {
-                await amm.removeLiquidity(toWad(1), {
-                    from: u2
-                });
+                await amm.removeLiquidity(toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("shareBalance limited"), error);
+                assert.ok(error.message.includes("shareBalance too low"));
             }
 
             // price == 7000 * amount == 0
-            await amm.removeLiquidity(toWad(1), {
-                from: u3
-            });
+            await amm.removeLiquidity(toWad(1), { from: u3 });
             assert.equal(fromWad(await cashBalanceOf(u3)), 21000 + 14000);
             assert.equal(fromWad(await share.balanceOf(u3)), 0);
             assert.equal(fromWad(await positionSize(u3)), 1);
@@ -883,7 +873,7 @@ contract('amm', accounts => {
                 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("shareBalance limited"), error);
+                assert.ok(error.message.includes("shareBalance too low"), error);
             }
         });
 

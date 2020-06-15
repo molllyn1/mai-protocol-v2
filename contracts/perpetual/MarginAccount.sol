@@ -311,11 +311,11 @@ contract MarginAccount is Collateral {
      *      Any loss caused by liquidated account is firstly be recovered by insurance fund, then uncovered part
      *      will become socialloss and applied to the side of its couterparty.
      *
-     * @param liquidator        Address who initiate liquidation.
-     * @param trader            Address who is liqudated.
+     * @param liquidator        Address who initiate the liquidating process.
+     * @param trader            Address who is liquidated.
      * @param liquidationPrice  Price to liquidate.
      * @param liquidationAmount Max amount to liquidate.
-     * @return Opened position amount for liquidator.
+     * @return Opened position amount for liquidate.
      */
     function liquidate(address liquidator, address trader, uint256 liquidationPrice, uint256 liquidationAmount)
         internal
@@ -331,24 +331,16 @@ contract MarginAccount is Collateral {
         int256 penaltyToFund = governance.penaltyFundRate.wmul(liquidationValue).toInt256();
 
         // position: trader => liquidator
-        close(account, liquidationPrice, liquidationAmount);
+        trade(trader, liquidationSide.counterSide(), liquidationPrice, liquidationAmount);
         uint256 opened = trade(liquidator, liquidationSide, liquidationPrice, liquidationAmount);
 
         // penalty: trader => liquidator, trader => insuranceFundBalance
-        // trader - penaltyToLiquidator - penaltyToFund
-        account.cashBalance = account.cashBalance
-            .sub(penaltyToLiquidator.add(penaltyToFund));
-        int256 liquidationLoss = 0;
-        if (account.cashBalance < 0) {
-            liquidationLoss = account.cashBalance.neg();
-            account.cashBalance = 0;
-        }
-        marginAccounts[trader] = account;
-        emit UpdatePositionAccount(trader, account, totalSize(liquidationSide), liquidationPrice);
-
+        updateCashBalance(trader, penaltyToLiquidator.add(penaltyToFund).neg());
         updateCashBalance(liquidator, penaltyToLiquidator);
         insuranceFundBalance = insuranceFundBalance.add(penaltyToFund);
 
+        // loss
+        int256 liquidationLoss = ensurePositiveBalance(trader).toInt256();
         // fund, fund penalty - possible social loss
         if (insuranceFundBalance >= liquidationLoss) {
             // insurance covers the loss
@@ -424,7 +416,7 @@ contract MarginAccount is Collateral {
         if (wadAmount == 0) {
             return;
         }
-        require(wadAmount > 0, "invalid transfer amount");
+        require(wadAmount > 0, "amount must be greater than 0");
         marginAccounts[from].cashBalance = marginAccounts[from].cashBalance.sub(wadAmount); // may be negative balance
         marginAccounts[to].cashBalance = marginAccounts[to].cashBalance.add(wadAmount);
         emit Transfer(from, to, wadAmount, marginAccounts[from].cashBalance, marginAccounts[to].cashBalance);

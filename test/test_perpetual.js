@@ -171,13 +171,13 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.depositToInsuranceFund(toWad(10), { from: u1 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid depositing parameter"));
+                assert.ok(error.message.includes("incorrect sent value"));
             }
             try {
                 await perpetual.depositToInsuranceFund(0, { value: 0 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"));
+                assert.ok(error.message.includes("amount must be greater than 0"));
             }
 
             await perpetual.depositToInsuranceFund(toWad(10.111), { value: toWad(10.111) });
@@ -199,7 +199,7 @@ contract('TestPerpetual', async accounts => {
                     gas: 200000,
                 });
             } catch (error) {
-                assert.ok(error.message.includes("no payable"));
+                assert.ok(error.message.includes("fallback function disabled"));
             }
             assert.equal(await cashBalanceOf(u1), toWad(0));
 
@@ -212,24 +212,24 @@ contract('TestPerpetual', async accounts => {
             try {
                 await perpetual.deposit(toWad(1000), { from: u1 });
             } catch (error) {
-                assert.ok(error.message.includes("invalid depositing parameter"));
+                assert.ok(error.message.includes("incorrect sent value"));
             }
             try {
                 await perpetual.deposit(toWad(1000), { from: u1, value: toWad(1001) });
             } catch (error) {
-                assert.ok(error.message.includes("invalid depositing parameter"));
+                assert.ok(error.message.includes("incorrect sent value"));
             }
             await global.addComponent(perpetual.address, admin);
             try {
                 await perpetual.depositFor(u1, toWad(1000), { from: admin, value: toWad(1001) });
             } catch (error) {
-                assert.ok(error.message.includes("invalid depositing parameter"));
+                assert.ok(error.message.includes("incorrect sent value"));
             }
             try {
                 await perpetual.depositFor("0x0000000000000000000000000000000000000000", toWad(1000), { value: toWad(1000), from: admin });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trader"));
+                assert.ok(error.message.includes("cannot deposit to 0 address"));
             }
 
             await perpetual.deposit(toWad(1000), { from: u1, value: toWad(1000)});
@@ -256,7 +256,7 @@ contract('TestPerpetual', async accounts => {
             await collateral.approve(perpetual.address, infinity, { from: u2 });
 
             await perpetual.depositFor(u2, toWad(1000));
- 
+
             await funding.setMarkPrice(toWad(7000));
         });
 
@@ -279,7 +279,7 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.oneSideTradePublic(u1, FLAT, toWad(7000), toWad(1));
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid side"));
+                assert.ok(error.message.includes("side must be long or short"));
             }
          })
 
@@ -312,7 +312,7 @@ contract('TestPerpetual', async accounts => {
             await collateral.approve(perpetual.address, infinity, { from: u3});
             await perpetual.depositFor(u3, toWad(1000));
 
-            
+
             await funding.setMarkPrice(toWad(7000));
         });
 
@@ -325,7 +325,7 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.liquidate(u1, toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid lot size"), error);
+                assert.ok(error.message.includes("amount must be divisible by lotSize"), error);
             }
         })
 
@@ -353,7 +353,7 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.liquidate(u1, toWad(0), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid lot size"));
+                assert.ok(error.message.includes("amount must be divisible by lotSize"));
             }
         })
 
@@ -514,13 +514,13 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.depositToInsuranceFund(toWad(10.111), { value: toWad(10.111)});
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid depositing parameter"));
+                assert.ok(error.message.includes("incorrect sent value"));
             }
             try {
                 await perpetual.depositToInsuranceFund(0);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"));
+                assert.ok(error.message.includes("amount must be greater than 0"));
             }
             try {
                 await perpetual.depositToInsuranceFund(toWad(-10));
@@ -538,7 +538,7 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.withdrawFromInsuranceFund(0);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"));
+                assert.ok(error.message.includes("amount must be greater than 0"));
             }
             try {
                 await perpetual.withdrawFromInsuranceFund(toWad(20));
@@ -562,7 +562,7 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.deposit(toWad(1000), { value: toWad(1000), from: u1});
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid depositing parameter"));
+                assert.ok(error.message.includes("incorrect sent value"));
             }
 
             await perpetual.deposit(toWad(1000), { from: u1 });
@@ -579,12 +579,12 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.depositFor(u1, toWad(1000), { value: toWad(1000), from: admin });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid depositing parameter"));
+                assert.ok(error.message.includes("incorrect sent value"));
             }
             try {
                 await perpetual.depositFor("0x0000000000000000000000000000000000000000", toWad(1000), { from: admin });
             } catch (error) {
-                assert.ok(error.message.includes("invalid trader"));
+                assert.ok(error.message.includes("cannot deposit to 0 address"));
             }
 
             await perpetual.depositFor(u1, toWad(1000), { from: admin });
@@ -653,7 +653,7 @@ contract('TestPerpetual', async accounts => {
             await global.addComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(7000 * 0.1));
 
-            
+
             assert.equal(fromWad(await collateral.balanceOf(u1)), 0);
 
             await funding.setMarkPrice(toWad(7000));
@@ -668,7 +668,7 @@ contract('TestPerpetual', async accounts => {
 
             await perpetual.depositFor(u2, toWad(7000 * 0.1));
 
-            
+
             await perpetual.oneSideTradePublic(u2, SHORT, toWad(7000), toWad(1));
 
             // now long-position earns
@@ -896,7 +896,7 @@ contract('TestPerpetual', async accounts => {
                 await perpetual.withdraw(toWad(0), { from: u1 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid amount"));
+                assert.ok(error.message.includes("amount must be greater than 0"));
             }
             try {
                 await perpetual.withdraw(1, { from: u1 });
@@ -915,7 +915,7 @@ contract('TestPerpetual', async accounts => {
             await global.addComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
-            
+
             await funding.setMarkPrice(toWad(7000));
 
             await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));
@@ -965,7 +965,7 @@ contract('TestPerpetual', async accounts => {
             await global.addComponent(perpetual.address, admin);
             await perpetual.depositFor(u1, toWad(1000));
 
-            
+
             await funding.setMarkPrice(toWad(7000));
 
             await perpetual.oneSideTradePublic(u1, LONG, toWad(7000), toWad(1));

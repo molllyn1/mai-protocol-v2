@@ -501,12 +501,12 @@ contract('amm-eth', accounts => {
             assert.equal(fromWad(await positionEntryValue(proxy.address)), 77000);
         });
 
-        it('removeLiquidity - fail - shareBalance limited', async () => {
+        it('removeLiquidity - fail - shareBalance too low', async () => {
             try {
                 await amm.removeLiquidity(toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("shareBalance limited"), error);
+                assert.ok(error.message.includes("shareBalance too low"), error);
             }
         });
 
@@ -578,7 +578,7 @@ contract('amm-eth', accounts => {
                 await amm.removeLiquidity(toWad(1), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("shareBalance limited"), error);
+                assert.ok(error.message.includes("shareBalance too low"), error);
             }
 
             // price == 7000 * amount == 0
@@ -620,7 +620,7 @@ contract('amm-eth', accounts => {
 
         it("settle", async () => {
             const fundingState1 = await amm.currentFundingState.call();
-            
+
             // await inspect(u1, perpetual, proxy, amm);
             // await printFunding(amm, perpetual);
             await perpetual.beginGlobalSettlement(toWad(1 / 160));
@@ -667,7 +667,7 @@ contract('amm-eth', accounts => {
 
         it("updateIndex failed", async () => {
             await amm.setGovernanceParameter(toBytes32("updatePremiumPrize"), toWad(0));
-            
+
             await perpetual.beginGlobalSettlement(toWad(1 / 160));
 
             await setIndexPrice(1 / 162);

@@ -149,13 +149,13 @@ contract('amm', accounts => {
                 await amm.createPool(toWad(0.5), { from: u1 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trading lot size"));
+                assert.ok(error.message.includes("amount must be divisible by tradingLotSize"));
             }
             try {
                 await amm.createPool(toWad(1.1), { from: u1 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trading lot size"));
+                assert.ok(error.message.includes("amount must be divisible by tradingLotSize"));
             }
 
             await amm.createPool(toWad(1), { from: u1 });
@@ -203,7 +203,7 @@ contract('amm', accounts => {
                 await amm.addLiquidity(toWad(0.1), { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid lot size"));
+                assert.ok(error.message.includes("amount must be divisible by lotSize"));
             }
             await amm.addLiquidity(toWad(1), { from: u2 });
 
@@ -258,7 +258,7 @@ contract('amm', accounts => {
                 await amm.buy(toWad(0.1), toWad('10000'), infinity, { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trading lot size"), error);
+                assert.ok(error.message.includes("amount must be divisible by tradingLotSize"), error);
             }
             await amm.buy(toWad(1), toWad('10000'), infinity, { from: u2 });
 
@@ -292,7 +292,7 @@ contract('amm', accounts => {
                 await amm.sell(toWad(0.1), toWad(0), infinity, { from: u2 });
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trading lot size"), error);
+                assert.ok(error.message.includes("amount must be divisible by tradingLotSize"), error);
             }
             await amm.sell(toWad(1), toWad(0), infinity, { from: u2 });
 

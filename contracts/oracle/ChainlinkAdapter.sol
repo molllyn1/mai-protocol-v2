@@ -18,7 +18,7 @@ contract ChainlinkAdapter is Ownable {
     bool public inversed;
 
     constructor(address _feeder, uint256 _timeout, bool _inversed) public {
-        require(_feeder != address(0), "invalid feeder");
+        require(_feeder != address(0), "feeder must not be 0 address");
         timeout = _timeout;
         feeder = IChainlinkFeeder(_feeder);
         inversed = _inversed;
@@ -36,7 +36,7 @@ contract ChainlinkAdapter is Ownable {
      */
     function price() public view returns (uint256 newPrice, uint256 timestamp) {
         newPrice = (feeder.latestAnswer().mul(CHAINLINK_DECIMALS_ADAPTER)).toUint256();
-        require(newPrice != 0, "invalid price");
+        require(newPrice != 0, "price must be greater than 0");
         timestamp = feeder.latestTimestamp();
         require(timestamp <= block.timestamp, "future timestmap");
         require(timestamp.add(timeout) >= block.timestamp, "price timeout");

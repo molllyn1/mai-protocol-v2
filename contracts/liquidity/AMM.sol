@@ -315,7 +315,7 @@ contract AMM is AMMGovernance {
         private
         returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
-        require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
+        require(perpetualProxy.isValidTradingLotSize(amount), "amount must be divisible by tradingLotSize");
 
         uint256 price = getBuyPrice(amount);
         require(limitPrice >= price, "price limited");
@@ -399,7 +399,7 @@ contract AMM is AMMGovernance {
         uint256 deadline
     ) private returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
-        require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
+        require(perpetualProxy.isValidTradingLotSize(amount), "amount must be divisible by tradingLotSize");
 
         uint256 price = getSellPrice(amount);
         require(limitPrice <= price, "price limited");
@@ -499,7 +499,7 @@ contract AMM is AMMGovernance {
         uint256 oldPoolPositionSize;
         (oldAvailableMargin, oldPoolPositionSize) = currentXY();
         require(oldPoolPositionSize != 0 && oldAvailableMargin != 0, "empty pool");
-        require(shareToken.balanceOf(msg.sender) >= shareAmount, "shareBalance limited");
+        require(shareToken.balanceOf(msg.sender) >= shareAmount, "shareBalance too low");
         uint256 price = oldAvailableMargin.wdiv(oldPoolPositionSize);
         uint256 amount = shareAmount.wmul(oldPoolPositionSize).wdiv(shareToken.totalSupply());
         // align to lotSize
@@ -869,7 +869,7 @@ contract AMM is AMMGovernance {
         uint256 endTimestamp
     ) private {
         require(fundingState.lastFundingTime != 0, "funding initialization required");
-        require(endTimestamp >= fundingState.lastFundingTime, "we can't go back in time");
+        require(endTimestamp >= fundingState.lastFundingTime, "time steps (n) must be positive");
 
         // update ema
         if (fundingState.lastFundingTime != endTimestamp) {

@@ -70,7 +70,7 @@ contract Exchange {
 
             require(takerOrderParam.trader != makerOrderParams[i].trader, "self trade");
             require(takerOrderParam.isInversed() == makerOrderParams[i].isInversed(), "invalid inversed pair");
-            require(takerOrderParam.isSell() != makerOrderParams[i].isSell(), "invalid side");
+            require(takerOrderParam.isSell() != makerOrderParams[i].isSell(), "side must be long or short");
             require(!makerOrderParams[i].isMarketOrder(), "market order cannot be maker");
 
             validatePrice(takerOrderParam, makerOrderParams[i]);
@@ -80,7 +80,7 @@ contract Exchange {
 
             require(amounts[i] <= takerOrderParam.amount.sub(takerFilledAmount), "taker overfilled");
             require(amounts[i] <= makerOrderParams[i].amount.sub(makerFilledAmount), "maker overfilled");
-            require(amounts[i].mod(tradingLotSize) == 0, "invalid trading lot size");
+            require(amounts[i].mod(tradingLotSize) == 0, "amount must be divisible by tradingLotSize");
 
             uint256 opened = fillOrder(perpetual, takerOrderParam, makerOrderParams[i], amounts[i]);
 
@@ -91,7 +91,7 @@ contract Exchange {
 
         // all trades done, check taker safe.
         if (takerOpened > 0) {
-            require(perpetual.isIMSafe(takerOrderParam.trader), "taker margin");
+            require(perpetual.isIMSafe(takerOrderParam.trader), "taker initial margin unsafe");
         } else {
             require(perpetual.isSafe(takerOrderParam.trader), "maker unsafe");
         }
@@ -114,7 +114,7 @@ contract Exchange {
         uint256 amount
     ) public {
         require(globalConfig.brokers(msg.sender), "unauthorized broker");
-        require(amount >= 0, "invalid amount");
+        require(amount > 0, "amount must be greater than 0");
         require(!takerOrderParam.isMakerOnly(), "taker order is maker only");
 
         IPerpetual perpetual = IPerpetual(_perpetual);
@@ -202,7 +202,7 @@ contract Exchange {
         claimTakerDevFee(perpetual, takerOrderParam.trader, price, takerOpened, amount.sub(takerOpened));
         claimMakerDevFee(perpetual, makerOrderParam.trader, price, makerOpened, amount.sub(makerOpened));
         if (makerOpened > 0) {
-            require(perpetual.isIMSafe(makerOrderParam.trader), "maker margin");
+            require(perpetual.isIMSafe(makerOrderParam.trader), "maker initial margin unsafe");
         } else {
             require(perpetual.isSafe(makerOrderParam.trader), "maker unsafe");
         }
@@ -307,7 +307,7 @@ contract Exchange {
         address devAddress = perpetual.devAddress();
         if (fee > 0) {
             int256 available = perpetual.availableMargin(trader);
-            require(available >= hard, "dev margin");
+            require(available >= hard, "available margin too low for fee");
             fee = fee.min(available);
             perpetual.transferCashBalance(trader, devAddress, fee.toUint256());
         } else if (fee < 0) {

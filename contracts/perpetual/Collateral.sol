@@ -77,7 +77,7 @@ contract Collateral is PerpetualGovernance {
      * @param rawAmount Amount of collateral to be deposited in its original decimals.
      */
     function withdraw(address payable trader, uint256 rawAmount) internal {
-        require(rawAmount > 0, "invalid amount");
+        require(rawAmount > 0, "amount must be greater than 0");
         int256 wadAmount = toWad(rawAmount);
         require(wadAmount <= marginAccounts[trader].cashBalance, "insufficient balance");
         marginAccounts[trader].cashBalance = marginAccounts[trader].cashBalance.sub(wadAmount);
@@ -94,7 +94,7 @@ contract Collateral is PerpetualGovernance {
      * @return Internal representation of the raw amount.
      */
     function pullCollateral(address trader, uint256 rawAmount) internal returns (int256 wadAmount) {
-        require(rawAmount > 0, "invalid amount");
+        require(rawAmount > 0, "amount must be greater than 0");
         if (isTokenizedCollateral()) {
             collateral.safeTransferFrom(trader, address(this), rawAmount);
         }

@@ -32,8 +32,8 @@ contract TestPerpetual is Perpetual {
         returns (uint256)
     {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
-        require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
-        require(amount.mod(governance.tradingLotSize) == 0, "invalid trading lot size");
+        require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "side must be long or short");
+        require(amount.mod(governance.tradingLotSize) == 0, "amount must be divisible by tradingLotSize");
         return MarginAccount.trade(trader, side, price, amount);
     }
 

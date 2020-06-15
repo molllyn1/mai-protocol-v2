@@ -22,8 +22,8 @@ contract GlobalConfig is Ownable {
     event RemoveBroker(address indexed broker);
     event AddPauseController(address indexed controller);
     event RemovePauseController(address indexed controller);
-    event AdddWithdrawControllers(address indexed controller);
-    event RemovedWithdrawControllers(address indexed controller);
+    event AddWithdrawController(address indexed controller);
+    event RemovedWithdrawController(address indexed controller);
     event AddComponent(address indexed perpetual, address indexed component);
     event RemovedComponent(address indexed perpetual, address indexed component);
 
@@ -112,7 +112,7 @@ contract GlobalConfig is Ownable {
      */
     function addWithdrawController(address controller) external onlyOwner {
         withdrawControllers.add(controller);
-        emit AdddWithdrawControllers(controller);
+        emit AddWithdrawController(controller);
     }
 
     /**
@@ -120,8 +120,8 @@ contract GlobalConfig is Ownable {
      *
      * @param controller Address of controller.
      */
-    function removeWithdrawControllers(address controller) external onlyOwner {
+    function removeWithdrawController(address controller) external onlyOwner {
         withdrawControllers.remove(controller);
-        emit RemovedWithdrawControllers(controller);
+        emit RemovedWithdrawController(controller);
     }
 }

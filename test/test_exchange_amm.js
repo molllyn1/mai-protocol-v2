@@ -197,7 +197,7 @@ contract('exchange-amm', accounts => {
             }
         });
 
-        it("invalid trading lot size", async () => {
+        it("amount must be divisible by tradingLotSize", async () => {
             await perpetual.deposit(toWad('87.67676767676767677'), { from: u2 });
             await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
             const takerOrder = await buildOrder({
@@ -217,7 +217,7 @@ contract('exchange-amm', accounts => {
                 await exchange.matchOrderWithAMM(takerOrder, perpetual.address, toWad(0.1));
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trading lot size"));
+                assert.ok(error.message.includes("amount must be divisible by tradingLotSize"));
             }
         });
 

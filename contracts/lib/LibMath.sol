@@ -2,8 +2,8 @@ pragma solidity 0.5.15;
 
 
 library LibMathSigned {
-    int256 private constant _WAD = 10**18;
-    int256 private constant _INT256_MIN = -2**255;
+    int256 private constant _WAD = 10 ** 18;
+    int256 private constant _INT256_MIN = -2 ** 255;
 
     uint8 private constant FIXED_DIGITS = 18;
     int256 private constant FIXED_1 = 10 ** 18;

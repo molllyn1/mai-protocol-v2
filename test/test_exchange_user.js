@@ -240,7 +240,7 @@ contract('exchange-user', accounts => {
                 await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid side"));
+                assert.ok(error.message.includes("side must be long or short"));
             }
         });
 
@@ -358,7 +358,7 @@ contract('exchange-user', accounts => {
             }
         });
 
-        it("invalid trading lot size", async () => {
+        it("amount must be divisible by tradingLotSize", async () => {
             await initialize(u1, 10000);
             await initialize(u2, 10000);
             await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
@@ -394,11 +394,11 @@ contract('exchange-user', accounts => {
                 await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trading lot size"), error);
+                assert.ok(error.message.includes("amount must be divisible by tradingLotSize"), error);
             }
         });
 
-        it("maker margin", async () => {
+        it("maker initial margin unsafe", async () => {
             await initialize(u1, 10000);
             await initialize(u2, 580);
             await funding.setMarkPrice(toWad(6000));
@@ -435,7 +435,7 @@ contract('exchange-user', accounts => {
                 await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("maker margin"), error);
+                assert.ok(error.message.includes("maker initial margin unsafe"), error);
             }
         });
 
@@ -574,7 +574,7 @@ contract('exchange-user', accounts => {
             }
         });
 
-        it("taker margin", async () => {
+        it("taker initial margin unsafe", async () => {
             await initialize(u1, 580);
             await initialize(u2, 5800);
             await funding.setMarkPrice(toWad(6000));
@@ -611,7 +611,7 @@ contract('exchange-user', accounts => {
                 await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("taker margin"), error);
+                assert.ok(error.message.includes("taker initial margin unsafe"), error);
             }
         });
 
@@ -1079,7 +1079,7 @@ contract('exchange-user', accounts => {
             );
             throw null;
         } catch (error) {
-            assert.ok(error.message.includes("dev margin"));
+            assert.ok(error.message.includes("available margin too low for fee"));
         }
 
         await funding.setMarkPrice(toWad("5400.000000000000000001"));
@@ -1768,7 +1768,7 @@ contract('exchange-user', accounts => {
                 );
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("invalid trading lot size"), error);
+                assert.ok(error.message.includes("amount must be divisible by tradingLotSize"), error);
             }
             await exchange.matchOrders(
                 takerParam,

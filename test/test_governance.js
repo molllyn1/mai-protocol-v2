@@ -41,6 +41,7 @@ contract('TestPerpGovernance', accounts => {
         await usePoolDefaultParameters();
     };
 
+
     const useDefaultGovParameters = async () => {
         await governance.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.1));
         await governance.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.05));
@@ -312,7 +313,7 @@ contract('TestPerpGovernance', accounts => {
             } catch (error) {
                 assert.ok(error.message.includes("wrong address"), error);
             }
-            
+
         });
 
         it('key not exists', async () => {
@@ -381,7 +382,7 @@ contract('TestPerpGovernance', accounts => {
                 assert.ok(error.message.includes("not the owner"));
             }
             try {
-                await globalConfig.removeWithdrawControllers(u1, {from: u1});
+                await globalConfig.removeWithdrawController(u1, {from: u1});
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("not the owner"));
@@ -438,9 +439,9 @@ contract('TestPerpGovernance', accounts => {
                 assert.ok(error.message.includes("address already exist"));
             }
             assert.ok(await globalConfig.withdrawControllers(u2));
-            await globalConfig.removeWithdrawControllers(u2, {from: u1});
+            await globalConfig.removeWithdrawController(u2, {from: u1});
             try {
-                await globalConfig.removeWithdrawControllers(u2, {from: u1});
+                await globalConfig.removeWithdrawController(u2, {from: u1});
                 throw null;
             } catch (error) {
                 assert.ok(error.message.includes("address not exist"));

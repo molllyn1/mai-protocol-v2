@@ -11,10 +11,6 @@ interface IPerpetual {
 
     function getMarginAccount(address trader) external view returns (LibTypes.MarginAccount memory);
 
-    function getWithdrawalLock(address trader) external view returns (LibTypes.DelayedVariable memory);
-
-    function getBroker(address trader) external view returns (LibTypes.DelayedVariable memory);
-
     function getGovernance() external view returns (LibTypes.PerpGovernanceConfig memory);
 
     function status() external view returns (LibTypes.Status);
@@ -70,6 +66,8 @@ interface IPerpetual {
     function insuranceFundBalance() external view returns (int256);
 
     function beginGlobalSettlement(uint256 price) external;
+
+    function endGlobalSettlement() external;
 
     function isValidLotSize(uint256 amount) external view returns (bool);
 

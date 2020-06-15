@@ -37,12 +37,6 @@ library LibTypes {
         int256 cashBalance;
     }
 
-    struct DelayedVariable {
-        bytes32 previousValue;
-        bytes32 currentValue;
-        uint256 blockHeight;
-    }
-
     //////////////////////////////////////////////////////////////////////////
     // AMM
     //////////////////////////////////////////////////////////////////////////

@@ -26,7 +26,7 @@ const ShareToken = artifacts.require('token/ShareToken.sol');
 
 const gasLimit = 8000000;
 
-contract('statement', accounts => {
+contract('settlement', accounts => {
     let priceFeeder;
     let collateral;
     let globalConfig;
@@ -175,12 +175,24 @@ contract('statement', accounts => {
     });
 
 
-    it("setCashBalance", async () => {
+    it("increaseCashBalance", async () => {
         await perpetual.deposit(toWad(7000), {from: u2});
         await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
 ``
         try {
-            await perpetual.setCashBalance(u2, toWad(1));
+            await perpetual.increaseCashBalance(u2, toWad(1));
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("wrong perpetual status"))
+        }
+    });
+
+    it("decreaseCashBalance", async () => {
+        await perpetual.deposit(toWad(7000), {from: u2});
+        await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
+``
+        try {
+            await perpetual.decreaseCashBalance(u2, toWad(1));
             throw null;
         } catch (error) {
             assert.ok(error.message.includes("wrong perpetual status"))
@@ -254,12 +266,18 @@ contract('statement', accounts => {
 
         await perpetual.beginGlobalSettlement(toWad(7000));
         try {
-            await perpetual.setCashBalance(u2, toWad(998, cash), {from: u2});
+            await perpetual.increaseCashBalance(u2, toWad(998), {from: u2});
             throw null;
         } catch (error) {
             assert.ok(error.message.includes("not owner"))
         }
-        await perpetual.setCashBalance(u2, toWad(998, cash));
+        try {
+            await perpetual.decreaseCashBalance(u2, toWad(998), {from: u2});
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("not owner"))
+        }
+        await perpetual.increaseCashBalance(u2, toWad(998));
         await perpetual.endGlobalSettlement();
 
         await perpetual.settle({from: u2});
@@ -267,24 +285,16 @@ contract('statement', accounts => {
         // console.log((await collateral.balanceOf(u2)).toString());
     })
 
-    it("set balance on settling 2", async () => {
+    it("set balance on settling 3", async () => {
         await perpetual.deposit(toWad(7000), {from: u2});
-        await amm.buy(toWad(1), toWad('10000'), infinity, {from: u2});
-
-        const token = (await collateral.balanceOf(u2)).toString();
-        const total = (await perpetual.marginBalance.call(u2)).toString();
-        const pnl = (await perpetual.pnl.call(u2)).toString();
-        // assert.equal(pnl, "-777777777777777777779");
-
-        const cash = fromWad((await perpetual.getMarginAccount(u2)).cashBalance);
 
         await perpetual.beginGlobalSettlement(toWad(7000));
-        await perpetual.setCashBalance(u2, "777777777777777777779");
-        await perpetual.endGlobalSettlement();
 
-        await perpetual.settle({from: u2});
-        assert.equal((await collateral.balanceOf(u2)).toString(), token);
-        // console.log((await collateral.balanceOf(u2)).toString());
+        await perpetual.decreaseCashBalance(u2, toWad(2000));
+        assert.equal(await cashBalanceOf(u2), toWad(5000));
+
+        await perpetual.increaseCashBalance(u2, toWad(2000));
+        assert.equal(await cashBalanceOf(u2), toWad(7000));
     })
 
     it("settling forbids", async () => {

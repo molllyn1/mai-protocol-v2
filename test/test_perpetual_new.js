@@ -113,7 +113,7 @@ contract('TestPerpetual', async accounts => {
             await perpetual.tradePosition(u1, u2, FLAT, toWad(7000), toWad(1));
             throw null;
         } catch (error) {
-            assert.ok(error.message.includes("invalid side"))
+            assert.ok(error.message.includes("side must be long or short"))
         }
 
         await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(1));
@@ -122,7 +122,7 @@ contract('TestPerpetual', async accounts => {
             await perpetual.tradePosition(u1, u2, LONG, toWad(7000), toWad(0.5));
             throw null;
         } catch (error) {
-            assert.ok(error.message.includes("invalid lot size"))
+            assert.ok(error.message.includes("amount must be divisible by lotSize"))
         }
     })
 
@@ -140,7 +140,7 @@ contract('TestPerpetual', async accounts => {
             await collateral.approve(perpetual.address, infinity, { from: u2 });
 
             await perpetual.depositFor(u2, toWad(1000));
- 
+
             await funding.setMarkPrice(toWad(7000));
         });
 
@@ -149,7 +149,7 @@ contract('TestPerpetual', async accounts => {
             await funding.setMarkPrice(toWad(7000));
 
             await perpetual.tradePosition(u1, u2, LONG, toWad(7000), toWad(1));
-            
+
             assert.equal(fromWad(await perpetual.positionMargin.call(u1)), 700);
             assert.equal(await positionSide(u1), LONG);
             assert.equal(fromWad(await perpetual.maintenanceMargin.call(u1)), 350);
