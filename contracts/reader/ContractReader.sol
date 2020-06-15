@@ -25,10 +25,6 @@ contract ContractReader {
         LibTypes.FundingState fundingParams;
     }
 
-    struct AccountStorage {
-        LibTypes.MarginAccount margin;
-    }
-
     function getGovParams(address perpetualAddress) public view returns (GovParams memory params) {
         IPerpetual perpetual = IPerpetual(perpetualAddress);
         params.perpGovernanceConfig = perpetual.getGovernance();
@@ -57,10 +53,10 @@ contract ContractReader {
     function getAccountStorage(address perpetualAddress, address trader)
         public
         view
-        returns (AccountStorage memory params)
+        returns (LibTypes.MarginAccount memory margin)
     {
         IPerpetual perpetual = IPerpetual(perpetualAddress);
-        params.margin = perpetual.getMarginAccount(trader);
+        return perpetual.getMarginAccount(trader);
     }
 
     /////////////////////////////////////////////////////
@@ -69,18 +65,18 @@ contract ContractReader {
     function getBetaAccountStorage(address perpetualAddress, address trader)
         public
         view
-        returns (AccountStorage memory params)
+        returns (LibTypes.MarginAccount memory margin)
     {
         IBetaPerpetual perpetual = IBetaPerpetual(perpetualAddress);
         IBetaPerpetual.BetaCollateralAccount memory collateral = perpetual.getCashBalance(trader);
         IBetaPerpetual.BetaPositionAccount memory position = perpetual.getPosition(trader);
 
-        params.margin.side = position.side;
-        params.margin.size = position.size;
-        params.margin.entryValue = position.entryValue;
-        params.margin.entrySocialLoss = position.entrySocialLoss;
-        params.margin.entryFundingLoss = position.entryFundingLoss;
-        params.margin.cashBalance = collateral.balance;
+        margin.side = position.side;
+        margin.size = position.size;
+        margin.entryValue = position.entryValue;
+        margin.entrySocialLoss = position.entrySocialLoss;
+        margin.entryFundingLoss = position.entryFundingLoss;
+        margin.cashBalance = collateral.balance;
     }
 }
 
