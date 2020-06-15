@@ -23,6 +23,8 @@ contract ContractReader {
         bool isGlobalSettled;
         uint256 globalSettlePrice;
         LibTypes.FundingState fundingParams;
+        uint256 oraclePrice;
+        uint256 oracleTime;
     }
 
     function getGovParams(address perpetualAddress) public view returns (GovParams memory params) {
@@ -48,6 +50,7 @@ contract ContractReader {
         params.globalSettlePrice = perpetual.settlementPrice();
 
         params.fundingParams = perpetual.amm().lastFundingState();
+        (params.oraclePrice, params.oracleTime) = perpetual.amm().indexPrice();
     }
 
     function getAccountStorage(address perpetualAddress, address trader)

@@ -84,7 +84,7 @@ contract('contractReader', accounts => {
     const usePoolDefaultParameters = async () => {
         await amm.setGovernanceParameter(toBytes32("poolFeeRate"), toWad(0.01));
         await amm.setGovernanceParameter(toBytes32("poolDevFeeRate"), toWad(0.005));
-        await amm.setGovernanceParameter(toBytes32("updatePremiumPrize"), toWad(1));
+        await amm.setGovernanceParameter(toBytes32("updatePremiumPrize"), toWad(0));
         await amm.setGovernanceParameter(toBytes32('emaAlpha'), '3327787021630616'); // 2 / (600 + 1)
         await amm.setGovernanceParameter(toBytes32('markPremiumLimit'), toWad(0.005));
         await amm.setGovernanceParameter(toBytes32('fundingDampener'), toWad(0.0005));
@@ -145,6 +145,18 @@ contract('contractReader', accounts => {
         assert.equal(fromWad(p.fundingParams.lastIndexPrice), 7000);
         assert.equal(fromWad(p.fundingParams.accumulatedFundingPerContract), 0);
         assert.equal(p.shareTokenAddress, share.address);
+        assert.notEqual(fromWad(p.oracleTime), 0);
+        assert.equal(fromWad(p.oraclePrice), 7000);
+
+        await setIndexPrice(7100);
+        const p2 = await contractReader.getPerpetualStorage(perpetual.address);
+        assert.equal(fromWad(p2.fundingParams.lastIndexPrice), 7000);
+        assert.equal(fromWad(p2.oraclePrice), 7100);
+
+        await amm.updateIndex();
+        const p3 = await contractReader.getPerpetualStorage(perpetual.address);
+        assert.equal(fromWad(p3.fundingParams.lastIndexPrice), 7100);
+        assert.equal(fromWad(p3.oraclePrice), 7100);
     });
 
     it('getAccountStorage', async () => {
