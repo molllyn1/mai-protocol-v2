@@ -10,9 +10,9 @@ contract GlobalConfig is Ownable {
 
     // Authrozied brokers, who is allowed to call match in exchange.
     mapping(address => bool) public brokers;
-    // Authrozied user, who is allowed to call pause/unpause in pereptual.
+    // Authrozied user, who is allowed to call pause/unpause in perpetual.
     mapping(address => bool) public pauseControllers;
-    // Authrozied user, who is allowed to call disable/enable withdraw in pereptual.
+    // Authrozied user, who is allowed to call disable/enable withdraw in perpetual.
     mapping(address => bool) public withdrawControllers;
     // components can call some dangerous methods in perpetual.
     mapping(address => mapping(address => bool)) public components;
@@ -31,9 +31,9 @@ contract GlobalConfig is Ownable {
         emit CreateGlobalConfig();
     }
 
-    /** 
+    /**
      * @dev Add authorized broker.
-     * 
+     *
      * @param broker Address of broker.
      */
     function addBroker(address broker) external onlyOwner {
@@ -41,9 +41,9 @@ contract GlobalConfig is Ownable {
         emit AddBroker(broker);
     }
 
-    /** 
+    /**
      * @dev Remove authorized broker.
-     * 
+     *
      * @param broker Address of broker.
      */
     function removeBroker(address broker) external onlyOwner {
@@ -51,9 +51,9 @@ contract GlobalConfig is Ownable {
         emit RemoveBroker(broker);
     }
 
-    /** 
+    /**
      * @dev Test if a address is a component of sender (perpetual).
-     * 
+     *
      * @param component Address of component contract.
      * @return True if given address is a component of sender.
      */
@@ -61,9 +61,9 @@ contract GlobalConfig is Ownable {
         return components[msg.sender][component];
     }
 
-     /** 
+     /**
      * @dev Add a component to whitelist of a perpetual.
-     * 
+     *
      * @param perpetual Address of perpetual.
      * @param component Address of component.
      */
@@ -73,9 +73,9 @@ contract GlobalConfig is Ownable {
         emit AddComponent(perpetual, component);
     }
 
-     /** 
+     /**
      * @dev Remove a component from whitelist of a perpetual.
-     * 
+     *
      * @param perpetual Address of perpetual.
      * @param component Address of component.
      */
@@ -84,10 +84,10 @@ contract GlobalConfig is Ownable {
         components[perpetual][component] = false;
         emit RemovedComponent(perpetual, component);
     }
-    
-    /** 
+
+    /**
      * @dev Add authorized pause controller.
-     * 
+     *
      * @param controller Address of controller.
      */
     function addPauseController(address controller) external onlyOwner {
@@ -95,9 +95,9 @@ contract GlobalConfig is Ownable {
         emit AddPauseController(controller);
     }
 
-    /** 
+    /**
      * @dev Remove authorized pause controller.
-     * 
+     *
      * @param controller Address of controller.
      */
     function removePauseController(address controller) external onlyOwner {
@@ -105,9 +105,9 @@ contract GlobalConfig is Ownable {
         emit RemovePauseController(controller);
     }
 
-    /** 
+    /**
      * @dev Add authorized withdraw controller.
-     * 
+     *
      * @param controller Address of controller.
      */
     function addWithdrawController(address controller) external onlyOwner {
@@ -115,9 +115,9 @@ contract GlobalConfig is Ownable {
         emit AdddWithdrawControllers(controller);
     }
 
-    /** 
+    /**
      * @dev Remove authorized withdraw controller.
-     * 
+     *
      * @param controller Address of controller.
      */
     function removeWithdrawControllers(address controller) external onlyOwner {

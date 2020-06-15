@@ -99,6 +99,6 @@ interface IBetaPerpetual {
         int256 entryFundingLoss;
     }
 
-    function getCashBalance(address guy) external view returns (BetaCollateralAccount memory);
-    function getPosition(address guy) external view returns (BetaPositionAccount memory);
+    function getCashBalance(address trader) external view returns (BetaCollateralAccount memory);
+    function getPosition(address trader) external view returns (BetaPositionAccount memory);
 }

@@ -235,7 +235,6 @@ contract MarginAccount is Collateral {
         account.entryValue = markPrice.wmul(account.size);
         account.entrySocialLoss = socialLossPerContract(account.side).wmul(account.size.toInt256());
         account.entryFundingLoss = amm.currentAccumulatedFundingPerContract().wmul(account.size.toInt256());
-        // updateBalance(trader, rpnl);
         emit UpdatePositionAccount(trader, account, totalSize(account.side), markPrice);
     }
 
@@ -291,6 +290,7 @@ contract MarginAccount is Collateral {
         uint256 opened = amount;
         uint256 closed;
         LibTypes.MarginAccount memory account = marginAccounts[trader];
+        LibTypes.Side originalSide = account.side;
         if (account.size > 0 && account.side != side) {
             closed = account.size.min(amount);
             close(account, price, closed);
@@ -300,8 +300,7 @@ contract MarginAccount is Collateral {
             open(account, side, price, opened);
         }
         marginAccounts[trader] = account;
-        // updateBalance(trader, rpnl);
-        emit UpdatePositionAccount(trader, account, totalSize(LibTypes.Side.LONG), price);
+        emit UpdatePositionAccount(trader, account, totalSize(originalSide), price);
         return opened;
     }
 
@@ -332,18 +331,24 @@ contract MarginAccount is Collateral {
         int256 penaltyToFund = governance.penaltyFundRate.wmul(liquidationValue).toInt256();
 
         // position: trader => liquidator
-        trade(trader, liquidationSide.counterSide(), liquidationPrice, liquidationAmount);
+        close(account, liquidationPrice, liquidationAmount);
         uint256 opened = trade(liquidator, liquidationSide, liquidationPrice, liquidationAmount);
 
         // penalty: trader => liquidator, trader => insuranceFundBalance
-        marginAccounts[trader].cashBalance = marginAccounts[trader].cashBalance
-            .sub(penaltyToLiquidator).sub(penaltyToFund);
-        marginAccounts[liquidator].cashBalance = marginAccounts[liquidator].cashBalance
-            .add(penaltyToLiquidator);
+        // trader - penaltyToLiquidator - penaltyToFund
+        account.cashBalance = account.cashBalance
+            .sub(penaltyToLiquidator.add(penaltyToFund));
+        int256 liquidationLoss = 0;
+        if (account.cashBalance < 0) {
+            liquidationLoss = account.cashBalance.neg();
+            account.cashBalance = 0;
+        }
+        marginAccounts[trader] = account;
+        emit UpdatePositionAccount(trader, account, totalSize(liquidationSide), liquidationPrice);
+
+        updateCashBalance(liquidator, penaltyToLiquidator);
         insuranceFundBalance = insuranceFundBalance.add(penaltyToFund);
 
-        // loss
-        int256 liquidationLoss = ensurePositiveBalance(trader).toInt256();
         // fund, fund penalty - possible social loss
         if (insuranceFundBalance >= liquidationLoss) {
             // insurance covers the loss
@@ -386,7 +391,10 @@ contract MarginAccount is Collateral {
      * @param wadAmount Amount of balance to be update. Both positive and negative are avaiable.
      * @return Internal representation of the raw amount.
      */
-    function updateBalance(address trader, int256 wadAmount) internal {
+    function updateCashBalance(address trader, int256 wadAmount) internal {
+        if (wadAmount == 0) {
+            return;
+        }
         marginAccounts[trader].cashBalance = marginAccounts[trader].cashBalance.add(wadAmount);
         emit InternalUpdateBalance(trader, wadAmount, marginAccounts[trader].cashBalance);
     }

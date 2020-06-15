@@ -19,7 +19,7 @@ library LibSignature {
      * This function will revert the transaction if the signature method is invalid.
      *
      * @param signature The signature data passed along with the order to validate against
-     * @param hash Hash bytes calculated by taking the EIP712 hash of the passed order data
+     * @param hash Hash bytes calculated by taking the hash of the passed order data
      * @param signerAddress The address of the signer
      * @return True if the calculated signature matches the order signature data, false otherwise.
      */

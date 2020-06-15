@@ -28,15 +28,15 @@ contract Collateral is PerpetualGovernance {
      * @param _collateral   Address of collateral token. 0x0 means using ether instead of erc20 token.
      * @param _decimals     Decimals of collateral token. The value should be within range [0, 18].
      */
-    constructor(address _globalConfig, address _collateral, uint256 _decimals) 
-        public 
+    constructor(address _globalConfig, address _collateral, uint256 _decimals)
+        public
         PerpetualGovernance(_globalConfig)
     {
         require(_decimals <= MAX_DECIMALS, "decimals out of range");
         require(_collateral != address(0) || _decimals == 18, "invalid decimals");
 
         collateral = IERC20(_collateral);
-        // This statement will trigger a 'InternalCompilerError: Assembly exception for bytecode'
+        // This statement will cause a 'InternalCompilerError: Assembly exception for bytecode'
         // scaler = (_decimals == MAX_DECIMALS ? 1 : 10**(MAX_DECIMALS.sub(_decimals))).toInt256();
         // But this will not.
         scaler = int256(10**(MAX_DECIMALS - _decimals));

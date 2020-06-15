@@ -15,10 +15,12 @@ contract Exchange {
     using LibOrder for LibOrder.OrderParam;
     using LibSignature for LibSignature.OrderSignature;
 
+    // to verify the field in order data, increase if there are incompatible update in order's data.
     uint256 public constant SUPPORTED_ORDER_VERSION = 2;
 
     IGlobalConfig public globalConfig;
 
+    // order status
     mapping(bytes32 => uint256) public filled;
     mapping(bytes32 => bool) public cancelled;
 
@@ -41,7 +43,7 @@ contract Exchange {
      * @param takerOrderParam   Taker's order to match.
      * @param makerOrderParams  Array of maker's order to match with.
      * @param _perpetual        Address of perpetual contract.
-     * @param amounts           Array of matching amounts of each taker/maker pair. 
+     * @param amounts           Array of matching amounts of each taker/maker pair.
      */
     function matchOrders(
         LibOrder.OrderParam memory takerOrderParam,
@@ -103,7 +105,7 @@ contract Exchange {
      *
      * @param takerOrderParam  Taker's order to match.
      * @param _perpetual        Address of perpetual contract.
-     * @param amount           Amount to fiil.  
+     * @param amount           Amount to fiil.
      * @return Opened position amount of taker.
      */
     function matchOrderWithAMM(
@@ -142,11 +144,9 @@ contract Exchange {
     }
 
     /**
-     * @dev Claim trading fee. Fee goes to brokers margin account.
+     * @dev Cancel order.
      *
-     * @param perpetual Address of perpetual contract.
-     * @param trader    Address of account who will pay fee out.
-     * @param fee       Amount of fee, decimals = 18.
+     * @param order Order to cancel.
      */
     function cancelOrder(LibOrder.Order memory order) public {
         require(msg.sender == order.trader || msg.sender == order.broker, "invalid caller");
@@ -169,18 +169,18 @@ contract Exchange {
     }
 
     /**
-     * @dev Fill order between one taker and one maker.
+     * @dev Fill order at the maker's price, then claim trading and dev fee from both side.
      *
      * @param perpetual        Address of perpetual contract.
      * @param takerOrderParam  Taker's order to match.
-     * @param takerOrderParam  Maker's order to match.
-     * @param amount           Amount to fiil.  
+     * @param makerOrderParam  Maker's order to match.
+     * @param amount           Amount to fiil.
      * @return Opened position amount of taker.
      */
     function fillOrder(
         IPerpetual perpetual,
         LibOrder.OrderParam memory takerOrderParam,
-        LibOrder.OrderParam memory takerOrderParam,
+        LibOrder.OrderParam memory makerOrderParam,
         uint256 amount
     ) internal returns (uint256) {
         uint256 price = makerOrderParam.getPrice();
@@ -213,7 +213,7 @@ contract Exchange {
     }
 
     /**
-     * @dev Check price in both side is meet.
+     * @dev Check prices are meet.
      *
      * @param takerOrderParam  Taker's order.
      * @param takerOrderParam  Maker's order.
@@ -233,10 +233,10 @@ contract Exchange {
 
 
     /**
-     * @dev Validate order.
+     * @dev Validate fields of order.
      *
-     * @param perpetual        Instance of perpetual contract.
-     * @param takerOrderParam  An order.
+     * @param perpetual  Instance of perpetual contract.
+     * @param orderParam Order parameter.
      * @return Valid order hash.
      */
     function validateOrderParam(IPerpetual perpetual, LibOrder.OrderParam memory orderParam)
@@ -267,8 +267,8 @@ contract Exchange {
         IPerpetual perpetual,
         address trader,
         int256 fee
-    ) 
-        internal 
+    )
+        internal
     {
         if (fee > 0) {
             perpetual.transferCashBalance(trader, msg.sender, fee.toUint256());
@@ -276,12 +276,10 @@ contract Exchange {
             perpetual.transferCashBalance(msg.sender, trader, fee.neg().toUint256());
         }
     }
-        
-        
+
+
     /**
-     * @dev Claim dev fee. Fee to open positions cannot be avoid.
-     *      But for closing position, the fee will be ignored if there is not enough
-     *      cash balance.
+     * @dev Claim dev fee. Especially, for fee from closing positon
      *
      * @param perpetual     Address of perpetual.
      * @param trader        Address of margin account.
@@ -297,7 +295,7 @@ contract Exchange {
         uint256 openedAmount,
         uint256 closedAmount,
         int256 feeRate
-    ) 
+    )
         internal
     {
         if (feeRate == 0) {
@@ -319,7 +317,7 @@ contract Exchange {
     }
 
     /**
-     * @dev Claim dev fee in taker fee rate set by pereptual governacne.
+     * @dev Claim dev fee in taker fee rate set by perpetual governacne.
      *
      * @param perpetual     Address of perpetual.
      * @param trader        Taker's order.
@@ -333,15 +331,15 @@ contract Exchange {
         uint256 price,
         uint256 openedAmount,
         uint256 closedAmount
-    ) 
-        internal 
+    )
+        internal
     {
         int256 rate = perpetual.getGovernance().takerDevFeeRate;
         claimDevFee(perpetual, trader, price, openedAmount, closedAmount, rate);
     }
 
     /**
-     * @dev Claim dev fee in maker fee rate set by pereptual governacne.
+     * @dev Claim dev fee in maker fee rate set by perpetual governacne.
      *
      * @param perpetual     Address of perpetual.
      * @param trader        Taker's order.
@@ -355,8 +353,8 @@ contract Exchange {
         uint256 price,
         uint256 openedAmount,
         uint256 closedAmount
-    ) 
-        internal 
+    )
+        internal
     {
         int256 rate = perpetual.getGovernance().makerDevFeeRate;
         claimDevFee(perpetual, trader, price, openedAmount, closedAmount, rate);

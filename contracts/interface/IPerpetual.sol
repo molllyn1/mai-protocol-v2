@@ -9,11 +9,11 @@ import "../lib/LibTypes.sol";
 interface IPerpetual {
     function devAddress() external view returns (address);
 
-    function getMarginAccount(address guy) external view returns (LibTypes.MarginAccount memory);
+    function getMarginAccount(address trader) external view returns (LibTypes.MarginAccount memory);
 
-    function getWithdrawalLock(address guy) external view returns (LibTypes.DelayedVariable memory);
+    function getWithdrawalLock(address trader) external view returns (LibTypes.DelayedVariable memory);
 
-    function getBroker(address guy) external view returns (LibTypes.DelayedVariable memory);
+    function getBroker(address trader) external view returns (LibTypes.DelayedVariable memory);
 
     function getGovernance() external view returns (LibTypes.PerpGovernanceConfig memory);
 
@@ -33,19 +33,19 @@ interface IPerpetual {
 
     function socialLossPerContract(LibTypes.Side side) external view returns (int256);
 
-    function availableMargin(address guy) external returns (int256);
+    function availableMargin(address trader) external returns (int256);
 
-    function positionMargin(address guy) external view returns (uint256);
+    function positionMargin(address trader) external view returns (uint256);
 
-    function maintenanceMargin(address guy) external view returns (uint256);
+    function maintenanceMargin(address trader) external view returns (uint256);
 
-    function isSafe(address guy) external returns (bool);
+    function isSafe(address trader) external returns (bool);
 
-    function isSafeWithPrice(address guy, uint256 currentMarkPrice) external returns (bool);
+    function isSafeWithPrice(address trader, uint256 currentMarkPrice) external returns (bool);
 
-    function isIMSafe(address guy) external returns (bool);
+    function isIMSafe(address trader) external returns (bool);
 
-    function isIMSafeWithPrice(address guy, uint256 currentMarkPrice) external returns (bool);
+    function isIMSafeWithPrice(address trader, uint256 currentMarkPrice) external returns (bool);
 
     function tradePosition(
         address taker,
@@ -61,11 +61,11 @@ interface IPerpetual {
         uint256 amount
     ) external;
 
-    function depositFor(address guy, uint256 amount) external payable;
+    function depositFor(address trader, uint256 amount) external payable;
 
-    function withdrawFor(address payable guy, uint256 amount) external;
+    function withdrawFor(address payable trader, uint256 amount) external;
 
-    function liquidate(address guy, uint256 amount) external returns (uint256, uint256);
+    function liquidate(address trader, uint256 amount) external returns (uint256, uint256);
 
     function insuranceFundBalance() external view returns (int256);
 

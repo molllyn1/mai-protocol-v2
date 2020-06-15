@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../lib/LibOrder.sol";
 import "../lib/LibTypes.sol";
 import "../lib/LibMath.sol";
-
 import "./MarginAccount.sol";
 
 contract Perpetual is MarginAccount, ReentrancyGuard {
@@ -24,7 +23,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
     event DisableWithdraw(address indexed caller);
     event EnableWithdraw(address indexed caller);
     event CreateAccount(uint256 indexed id, address indexed trader);
-    event Trade(address indexed taker, address indexed maker, LibTypes.Side side, uint256 price, uint256 amount);
+    event Trade(address indexed trader, LibTypes.Side side, uint256 price, uint256 amount);
     event Liquidate(address indexed keeper, address indexed trader, uint256 price, uint256 amount);
     event UpdateSettlementPrice(uint256 price);
     event EnterEmergencyStatus(uint256 price);
@@ -35,8 +34,8 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         address _devAddress,
         address _collateral,
         uint256 _collateralDecimals
-    ) 
-        public 
+    )
+        public
         MarginAccount(_globalConfig, _collateral, _collateralDecimals)
     {
         devAddress = _devAddress;
@@ -92,7 +91,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      */
     function enableWithdraw() external {
         require(
-            globalConfig.withdrawControllers(msg.sender) || globalConfig.owner() == msg.sender, 
+            globalConfig.withdrawControllers(msg.sender) || globalConfig.owner() == msg.sender,
             "unauthorized caller"
         );
         require(withdrawDisabled, "not disabled");
@@ -107,11 +106,21 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader Address of account owner.
      * @param amount Absolute cash balance value to be set.
      */
-    function setCashBalance(address trader, int256 amount) external onlyOwner {
+    function increaseCashBalance(address trader, uint256 amount) external onlyOwner {
         require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
-        int256 deltaAmount = amount.sub(marginAccounts[trader].cashBalance);
-        marginAccounts[trader].cashBalance = amount;
-        emit InternalUpdateBalance(trader, deltaAmount, amount);
+        updateCashBalance(trader, amount.toInt256());
+    }
+
+    /**
+     * @notice Force to set cash balance of margin account. Called by administrator to
+     *      fix unexpected cash balance.
+     *
+     * @param trader Address of account owner.
+     * @param amount Absolute cash balance value to be set.
+     */
+    function decreaseCashBalance(address trader, uint256 amount) external onlyOwner {
+        require(status == LibTypes.Status.EMERGENCY, "wrong perpetual status");
+        updateCashBalance(trader, amount.toInt256().neg());
     }
 
     /**
@@ -188,7 +197,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param rawAmount Amount to deposit.
      */
-    function deposit(uint256 rawAmount) external payable nonReentrant {
+    function deposit(uint256 rawAmount) external payable {
         depositImplementation(msg.sender, rawAmount);
     }
 
@@ -197,7 +206,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      *
      * @param rawAmount Amount to withdraw.
      */
-    function withdraw(uint256 rawAmount) external nonReentrant {
+    function withdraw(uint256 rawAmount) external {
         withdrawImplementation(msg.sender, rawAmount);
     }
 
@@ -205,7 +214,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @notice Close all position and withdraw all collateral remaining in sender's margin account.
      *         Settle is only available in settled state and can be called multiple times.
      */
-    function settle() external nonReentrant 
+    function settle() external nonReentrant
     {
         address payable trader = msg.sender;
         settleImplementation(trader);
@@ -228,11 +237,10 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address of margin account to deposit into.
      * @param rawAmount Amount of collateral to deposit.
      */
-    function depositFor(address trader, uint256 rawAmount) 
-        external 
-        payable 
-        onlyAuthorized 
-        nonReentrant 
+    function depositFor(address trader, uint256 rawAmount)
+        external
+        payable
+        onlyAuthorized
     {
         depositImplementation(trader, rawAmount);
     }
@@ -245,10 +253,9 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address of margin account to deposit into.
      * @param rawAmount Amount of collateral to deposit.
      */
-    function withdrawFor(address payable trader, uint256 rawAmount) 
-        external 
-        onlyAuthorized 
-        nonReentrant 
+    function withdrawFor(address payable trader, uint256 rawAmount)
+        external
+        onlyAuthorized
     {
         withdrawImplementation(trader, rawAmount);
     }
@@ -376,7 +383,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader Address of account owner.
      * @param currentMarkPrice Mark price.
      * @return True if give trader is safe with initial margin rate.
-     */    
+     */
     function isIMSafeWithPrice(address trader, uint256 currentMarkPrice) public returns (bool) {
         return availableMarginWithPrice(trader, currentMarkPrice) >= 0;
     }
@@ -387,14 +394,14 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address of account owner.
      * @param maxAmount Mark price.
      * @return True if give trader is safe with initial margin rate.
-     */  
+     */
     function liquidate(
-        address trader, 
+        address trader,
         uint256 maxAmount
-    ) 
+    )
         public
         onlyNotPaused
-        returns (uint256, uint256) 
+        returns (uint256, uint256)
     {
         require(msg.sender != trader, "self liquidate");
         require(isValidLotSize(maxAmount), "invalid lot size");
@@ -426,11 +433,11 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         LibTypes.Side side,
         uint256 price,
         uint256 amount
-    ) 
+    )
         public
         onlyNotPaused
-        onlyAuthorized 
-        returns (uint256 takerOpened, uint256 makerOpened) 
+        onlyAuthorized
+        returns (uint256 takerOpened, uint256 makerOpened)
     {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         require(side == LibTypes.Side.LONG || side == LibTypes.Side.SHORT, "invalid side");
@@ -440,17 +447,18 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         makerOpened = MarginAccount.trade(maker, side.counterSide(), price, amount);
         require(totalSize(LibTypes.Side.LONG) == totalSize(LibTypes.Side.SHORT), "imbalanced total size");
 
-        emit Trade(taker, maker, side, price, amount);
+        emit Trade(taker, side, price, amount);
+        emit Trade(maker, side.counterSide(), price, amount);
     }
 
     function transferCashBalance(
         address from,
         address to,
         uint256 amount
-    ) 
-        public 
+    )
+        public
         onlyNotPaused
-        onlyAuthorized 
+        onlyAuthorized
     {
         require(status != LibTypes.Status.EMERGENCY, "wrong perpetual status");
         MarginAccount.transferBalance(from, to, amount.toInt256());
@@ -479,7 +487,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address the collateral will be transferred from.
      * @param rawAmount Amount to deposit.
      */
-    function depositImplementation(address trader, uint256 rawAmount) internal onlyNotPaused {
+    function depositImplementation(address trader, uint256 rawAmount) internal onlyNotPaused nonReentrant {
         checkDepositingParameter(rawAmount);
         require(rawAmount > 0, "invalid amount");
         require(trader != address(0), "invalid trader");
@@ -497,7 +505,7 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
      * @param trader    Address the collateral will be transferred to.
      * @param rawAmount Amount to withdraw.
      */
-    function withdrawImplementation(address payable trader, uint256 rawAmount) internal onlyNotPaused {
+    function withdrawImplementation(address payable trader, uint256 rawAmount) internal onlyNotPaused nonReentrant {
         require(!withdrawDisabled, "withdraw disabled");
         require(status == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(rawAmount > 0, "invalid amount");
@@ -525,8 +533,9 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
         if (account.size == 0) {
             return;
         }
+        LibTypes.Side originalSide = account.side;
         close(account, currentMarkPrice, account.size);
         marginAccounts[trader] = account;
-        emit UpdatePositionAccount(trader, account, totalSize(LibTypes.Side.LONG), currentMarkPrice);
+        emit UpdatePositionAccount(trader, account, totalSize(originalSide), currentMarkPrice);
     }
 }

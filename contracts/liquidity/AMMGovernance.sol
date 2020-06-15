@@ -42,6 +42,12 @@ contract AMMGovernance {
         _;
     }
 
+    /**
+     * @dev Set governance parameters.
+     *
+     * @param key   Name of parameter.
+     * @param value Value of parameter.
+     */
     function setGovernanceParameter(bytes32 key, int256 value) public onlyOwner {
         if (key == "poolFeeRate") {
             governance.poolFeeRate = value.toUint256();
@@ -71,6 +77,7 @@ contract AMMGovernance {
         emit UpdateGovernanceParameter(key, value);
     }
 
+    // get governance data structure.
     function getGovernance() public view returns (LibTypes.AMMGovernanceConfig memory) {
         return governance;
     }

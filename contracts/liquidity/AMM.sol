@@ -27,8 +27,8 @@ contract AMM is AMMGovernance {
         address _perpetualProxy,
         address _priceFeeder,
         address _shareToken
-    ) 
-        public 
+    )
+        public
         AMMGovernance(_globalConfig)
     {
         priceFeeder = IPriceFeeder(_priceFeeder);
@@ -109,7 +109,7 @@ contract AMM is AMMGovernance {
      * @notice EMAPremium.
      *
      * Note: last* functions (lastFundingState, lastAvailableMargin, lastFairPrice, etc.) are calculated based on
-     *       the on-chain fundingState. current* functions are calculated based on the current timestamp.
+     *       on-chain fundingState. current* functions are calculated based on the current timestamp.
      */
     function lastEMAPremium() internal view returns (int256) {
         return fundingState.lastEMAPremium;
@@ -311,8 +311,8 @@ contract AMM is AMMGovernance {
         uint256 amount,
         uint256 limitPrice,
         uint256 deadline
-    ) 
-        private 
+    )
+        private
         returns (uint256) {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
         require(perpetualProxy.isValidTradingLotSize(amount), "invalid trading lot size");
@@ -348,10 +348,10 @@ contract AMM is AMMGovernance {
         uint256 amount,
         uint256 limitPrice,
         uint256 deadline
-    ) 
-        public 
-        onlyAuthorized 
-        returns (uint256) 
+    )
+        public
+        onlyAuthorized
+        returns (uint256)
     {
         return buyFrom(trader, amount, limitPrice, deadline);
     }
@@ -431,10 +431,10 @@ contract AMM is AMMGovernance {
         uint256 amount,
         uint256 limitPrice,
         uint256 deadline
-    ) 
-        public 
-        onlyAuthorized 
-        returns (uint256) 
+    )
+        public
+        onlyAuthorized
+        returns (uint256)
     {
         return sellFrom(trader, amount, limitPrice, deadline);
     }
@@ -547,7 +547,10 @@ contract AMM is AMMGovernance {
         uint256 tradeAmount,
         uint256 limitPrice,
         uint256 deadline
-    ) public payable {
+    )
+        public
+        payable
+    {
         if (depositAmount > 0) {
             perpetualProxy.depositFor.value(msg.value)(msg.sender, depositAmount);
         }
@@ -571,7 +574,10 @@ contract AMM is AMMGovernance {
         uint256 tradeAmount,
         uint256 limitPrice,
         uint256 deadline
-    ) public payable {
+    )
+        public
+        payable
+    {
         if (depositAmount > 0) {
             perpetualProxy.depositFor.value(msg.value)(msg.sender, depositAmount);
         }
@@ -797,7 +803,7 @@ contract AMM is AMMGovernance {
             forceFunding(blockTime, newIndexPrice, newIndexTimestamp);
         }
     }
- 
+
     /**
      * @notice Update fundingState without checking whether the funding condition changes.
      *
@@ -877,7 +883,7 @@ contract AMM is AMMGovernance {
             );
             fundingState.accumulatedFundingPerContract = fundingState.accumulatedFundingPerContract.add(
                 acc.div(FUNDING_PERIOD)
-            ); // ema is according to the old index
+            );
             fundingState.lastFundingTime = endTimestamp;
         }
 

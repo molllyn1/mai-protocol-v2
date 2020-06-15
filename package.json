@@ -3,7 +3,7 @@
     "test": "truffle test",
     "compile": "truffle compile",
     "migrate": "truffle migrate",
-    "coverage": "truffle run coverage"
+    "coverage": "node --max-old-space-size=65536 ./node_modules/.bin/truffle run coverage"
   },
   "dependencies": {
     "@openzeppelin/contracts": "2.5.0",

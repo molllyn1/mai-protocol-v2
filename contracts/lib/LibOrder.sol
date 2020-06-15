@@ -54,6 +54,14 @@ library LibOrder {
         LibSignature.OrderSignature signature;
     }
 
+    /**
+     * @dev Get order hash from parameters of order. Rebuild order and hash it.
+     *
+     * @param orderParam Order parameters.
+     * @param perpetual  Address of perpetual contract.
+     * @param broker     Address of broker.
+     * @return Hash of the order.
+     */
     function getOrderHash(
         OrderParam memory orderParam,
         address perpetual,
@@ -63,10 +71,24 @@ library LibOrder {
         orderHash = LibEIP712.hashEIP712Message(hashOrder(order));
     }
 
+    /**
+     * @dev Get order hash from order.
+     *
+     * @param order Order to hash.
+     * @return Hash of the order.
+     */
     function getOrderHash(Order memory order) internal pure returns (bytes32 orderHash) {
         orderHash = LibEIP712.hashEIP712Message(hashOrder(order));
     }
 
+    /**
+     * @dev Get order from parameters.
+     *
+     * @param orderParam Order parameters.
+     * @param perpetual  Address of perpetual contract.
+     * @param broker     Address of broker.
+     * @return Order data structure.
+     */
     function getOrder(
         OrderParam memory orderParam,
         address perpetual,
@@ -80,20 +102,31 @@ library LibOrder {
         order.data = orderParam.data;
     }
 
+    /**
+     * @dev Hash fields in order to generate a hash as identifier.
+     *
+     * @param order Order to hash.
+     * @return Hash of the order.
+     */
     function hashOrder(Order memory order) internal pure returns (bytes32 result) {
         bytes32 orderType = EIP712_ORDER_TYPE;
         // solium-disable-next-line security/no-inline-assembly
         assembly {
+            // "Order(address trader,address broker,address perpetual,uint256 amount,uint256 price,bytes32 data)"
+            // hash these 6 field to get a hash
+            // address will be extended to 32 bytes.
             let start := sub(order, 32)
             let tmp := mload(start)
             mstore(start, orderType)
-            // [0...32)   bytes: EIP712_ORDER_TYPE
-            // [32...224) bytes: order
+            // [0...32)   bytes: EIP712_ORDER_TYPE, len 32
+            // [32...224) bytes: order, len 6 * 32
             // 224 = 32 + 192
             result := keccak256(start, 224)
             mstore(start, tmp)
         }
     }
+
+    // extract order parameters.
 
     function orderVersion(OrderParam memory orderParam) internal pure returns (uint256) {
         return uint256(uint8(bytes1(orderParam.data)));
