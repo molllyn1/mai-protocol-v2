@@ -149,11 +149,11 @@ contract('contractReader', accounts => {
 
     it('getAccountStorage', async () => {
         const p = await contractReader.getAccountStorage(perpetual.address, u1);
-        assert.equal(fromWad(p.margin.cashBalance), 70000);
-        assert.equal(parseInt(p.margin.side), 1);
-        assert.equal(fromWad(p.margin.size), 100);
-        assert.equal(fromWad(p.margin.entryValue), 700000);
-        assert.equal(fromWad(p.margin.entrySocialLoss), 0);
-        assert.equal(fromWad(p.margin.entryFundingLoss), 0);
+        assert.equal(fromWad(p.cashBalance), 70000);
+        assert.equal(parseInt(p.side), 1);
+        assert.equal(fromWad(p.size), 100);
+        assert.equal(fromWad(p.entryValue), 700000);
+        assert.equal(fromWad(p.entrySocialLoss), 0);
+        assert.equal(fromWad(p.entryFundingLoss), 0);
     });
 });
