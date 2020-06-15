@@ -10,13 +10,6 @@ module.exports = {
             gas: 8000000,
             gasPrice: 20000000000,
         },
-        s10: {
-            host: 'server10.jy.mcarlo.com',
-            port: 8746,
-            network_id: '*',
-            gas: 8000000,
-            gasPrice: 20000000000,
-        },
         production: {
             provider: () => new PrivateKeyProvider(process.env.PK, 'https://mainnet.infura.io'),
             network_id: 1,
