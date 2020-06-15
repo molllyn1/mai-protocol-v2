@@ -257,7 +257,8 @@ contract AMM is AMMGovernance {
      * The semantics of this function is almost identical to addLiquidity except that the trading price
      * is not determined by fairPrice, but by indexPrice.
      *
-     * @param amount Sell amount.
+     * Note: buy() and sell() will fail before this function is called.
+     * @param amount Sell amount. Must be a multiple of lotSize.
      */
     function createPool(uint256 amount) public {
         require(amount > 0, "amount must be greater than zero");
@@ -302,7 +303,7 @@ contract AMM is AMMGovernance {
      * @notice Real implementation of buy/long.
      *
      * @param trader The trader.
-     * @param amount Buy amount.
+     * @param amount Buy amount. Must be a multiple of lotSize.
      * @param limitPrice Assert the trading price <= limitPrice.
      * @param deadline Assert the trading time <= deadline.
      */
@@ -339,7 +340,7 @@ contract AMM is AMMGovernance {
      * @notice Buy/long with AMM if the trader comes from the whitelist.
      *
      * @param trader The trader.
-     * @param amount Buy amount.
+     * @param amount Buy amount. Must be a multiple of lotSize.
      * @param limitPrice Assert the trading price <= limitPrice.
      * @param deadline Assert the trading time <= deadline.
      */
@@ -359,7 +360,7 @@ contract AMM is AMMGovernance {
     /**
      * @notice Buy/long with AMM.
      *
-     * @param amount Buy amount.
+     * @param amount Buy amount. Must be a multiple of lotSize.
      * @param limitPrice Assert the trading price <= limitPrice.
      * @param deadline Assert the trading time <= deadline.
      */
@@ -388,7 +389,7 @@ contract AMM is AMMGovernance {
      * @notice Real implementation of sell/short.
      *
      * @param trader The trader.
-     * @param amount Sell amount.
+     * @param amount Sell amount. Must be a multiple of lotSize.
      * @param limitPrice Assert the trading price >= limitPrice.
      * @param deadline Assert the trading time <= deadline.
      */
@@ -422,7 +423,7 @@ contract AMM is AMMGovernance {
      * @notice Sell/short with AMM if the trader comes from the whitelist.
      *
      * @param trader The trader.
-     * @param amount Sell amount.
+     * @param amount Sell amount. Must be a multiple of lotSize.
      * @param limitPrice Assert the trading price >= limitPrice.
      * @param deadline Assert the trading time <= deadline.
      */
@@ -442,7 +443,7 @@ contract AMM is AMMGovernance {
     /**
      * @notice Sell/short with AMM.
      *
-     * @param amount Sell amount.
+     * @param amount Sell amount. Must be a multiple of lotSize.
      * @param limitPrice Assert the trading price >= limitPrice.
      * @param deadline Assert the trading time <= deadline.
      */
@@ -464,7 +465,7 @@ contract AMM is AMMGovernance {
      *
      * The number of short positions obtained is obviously the same as the number of long positions obtained in the pool.
      *
-     * @param amount Sell amount.
+     * @param amount Sell amount. Must be a multiple of lotSize.
      */
     function addLiquidity(uint256 amount) public {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
@@ -490,6 +491,9 @@ contract AMM is AMMGovernance {
     /**
      * @notice Burn Share tokens to remove the collateral attributed to the current liquidity provider
      *         from AMM into the liquidity provider's margin account.
+     *
+     * @param shareAmount The number of share tokens about to burn. The real trading amount will be
+     *        automatically aligned to lotSize.
      */
     function removeLiquidity(uint256 shareAmount) public {
         require(perpetualProxy.status() == LibTypes.Status.NORMAL, "wrong perpetual status");
