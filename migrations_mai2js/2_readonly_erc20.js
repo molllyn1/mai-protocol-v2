@@ -23,7 +23,7 @@ module.exports = async function (deployer, network, accounts) {
     await deployer.deploy(GlobalConfig);
     await deployer.deploy(Perpetual, GlobalConfig.address, dev, ctk, 18);
     await deployer.deploy(Proxy, Perpetual.address);
-    await deployer.deploy(AMM, Proxy.address, PriceFeeder.address, ShareToken.address);
+    await deployer.deploy(AMM, GlobalConfig.address, Proxy.address, PriceFeeder.address, ShareToken.address);
     await deployer.deploy(Exchange, GlobalConfig.address);
     console.log('  「 Address summary 」--------------------------------------');
     console.log('   > TestToken:      ', ctk);
@@ -70,8 +70,9 @@ module.exports = async function (deployer, network, accounts) {
     await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
 
     console.log('whitelist');
-    await perpetual.addWhitelisted(proxy.address);
-    await perpetual.addWhitelisted(exchange.address);
+    await globalConfig.addComponent(perpetual.address, proxy.address);
+    await globalConfig.addComponent(perpetual.address, exchange.address);
+    await globalConfig.addComponent(amm.address, exchange.address);
 
     console.log('feed price (test only)...');
     const price = (new BigNumber('1')).div('200').shiftedBy(18).dp(0, BigNumber.ROUND_DOWN);

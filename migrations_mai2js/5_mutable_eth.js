@@ -23,7 +23,7 @@ module.exports = async function (deployer, network, accounts) {
     await deployer.deploy(ShareToken, "ShareToken", "STK", 18);
     await deployer.deploy(Perpetual, globalConfig.address, dev, ctk, 18);
     await deployer.deploy(Proxy, Perpetual.address);
-    await deployer.deploy(AMM, Proxy.address, priceFeeder.address, ShareToken.address);
+    await deployer.deploy(AMM, globalConfig.address, Proxy.address, priceFeeder.address, ShareToken.address);
     console.log('  「 Address summary 」--------------------------------------');
     console.log('   > ShareToken:     ', ShareToken.address);
     console.log('   > Perpetual:      ', Perpetual.address);
@@ -62,8 +62,9 @@ module.exports = async function (deployer, network, accounts) {
     await perpetual.setGovernanceAddress(toBytes32("amm"), amm.address);
 
     console.log('whitelist');
-    await perpetual.addWhitelisted(proxy.address);
-    await perpetual.addWhitelisted(exchange.address);
+    await globalConfig.addComponent(perpetual.address, proxy.address);
+    await globalConfig.addComponent(perpetual.address, exchange.address);
+    await globalConfig.addComponent(amm.address, exchange.address);
 
     const saver = require("./save_address.js");
     saver("transactEthTestAddress", {
