@@ -25,7 +25,6 @@ contract Perpetual is MarginAccount, ReentrancyGuard {
     event CreateAccount(uint256 indexed id, address indexed trader);
     event Trade(address indexed trader, LibTypes.Side side, uint256 price, uint256 amount);
     event Liquidate(address indexed keeper, address indexed trader, uint256 price, uint256 amount);
-    event UpdateSettlementPrice(uint256 price);
     event EnterEmergencyStatus(uint256 price);
     event EnterSettledStatus(uint256 price);
 
