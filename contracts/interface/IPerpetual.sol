@@ -15,6 +15,10 @@ interface IPerpetual {
 
     function status() external view returns (LibTypes.Status);
 
+    function paused() external view returns (bool);
+
+    function withdrawDisabled() external view returns (bool);
+
     function settlementPrice() external view returns (uint256);
 
     function globalConfig() external view returns (address);

@@ -14,7 +14,7 @@ contract PerpetualStorage {
     using LibMathSigned for int256;
     using LibMathUnsigned for uint256;
 
-    bool public paused = false; 
+    bool public paused = false;
     bool public withdrawDisabled = false;
 
     // Global configuation instance address

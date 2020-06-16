@@ -139,6 +139,8 @@ contract('contractReader', accounts => {
         assert.equal(fromWad(p.insuranceFundBalance), 0);
         assert.equal(p.isEmergency, false);
         assert.equal(p.isGlobalSettled, false);
+        assert.equal(p.isPaused, false);
+        assert.equal(p.isWithdrawDisabled, false);
         assert.notEqual(fromWad(p.fundingParams.lastFundingTime), 0);
         assert.equal(fromWad(p.fundingParams.lastPremium), 0);
         assert.equal(fromWad(p.fundingParams.lastEMAPremium), 0);

@@ -22,6 +22,8 @@ contract ContractReader {
         bool isEmergency;
         bool isGlobalSettled;
         uint256 globalSettlePrice;
+        bool isPaused;
+        bool isWithdrawDisabled;
         LibTypes.FundingState fundingParams;
         uint256 oraclePrice;
         uint256 oracleTime;
@@ -41,13 +43,15 @@ contract ContractReader {
         params.shareTokenAddress = address(perpetual.amm().shareTokenAddress());
 
         params.totalSize = perpetual.totalSize(LibTypes.Side.LONG);
+        params.insuranceFundBalance = perpetual.insuranceFundBalance();
         params.longSocialLossPerContract = perpetual.socialLossPerContract(LibTypes.Side.LONG);
         params.shortSocialLossPerContract = perpetual.socialLossPerContract(LibTypes.Side.SHORT);
-        params.insuranceFundBalance = perpetual.insuranceFundBalance();
 
         params.isEmergency = perpetual.status() == LibTypes.Status.EMERGENCY;
         params.isGlobalSettled = perpetual.status() == LibTypes.Status.SETTLED;
         params.globalSettlePrice = perpetual.settlementPrice();
+        params.isPaused = perpetual.paused();
+        params.isWithdrawDisabled = perpetual.withdrawDisabled();
 
         params.fundingParams = perpetual.amm().lastFundingState();
         (params.oraclePrice, params.oracleTime) = perpetual.amm().indexPrice();
@@ -80,6 +84,24 @@ contract ContractReader {
         margin.entrySocialLoss = position.entrySocialLoss;
         margin.entryFundingLoss = position.entryFundingLoss;
         margin.cashBalance = collateral.balance;
+    }
+
+    function getBetaPerpetualStorage(address perpetualAddress) public view returns (PerpetualStorage memory params) {
+        IPerpetual perpetual = IPerpetual(perpetualAddress);
+        params.collateralTokenAddress = address(perpetual.collateral());
+        params.shareTokenAddress = address(perpetual.amm().shareTokenAddress());
+
+        params.totalSize = perpetual.totalSize(LibTypes.Side.LONG);
+        params.insuranceFundBalance = perpetual.insuranceFundBalance();
+        params.longSocialLossPerContract = perpetual.socialLossPerContract(LibTypes.Side.LONG);
+        params.shortSocialLossPerContract = perpetual.socialLossPerContract(LibTypes.Side.SHORT);
+
+        params.isEmergency = perpetual.status() == LibTypes.Status.EMERGENCY;
+        params.isGlobalSettled = perpetual.status() == LibTypes.Status.SETTLED;
+        params.globalSettlePrice = perpetual.settlementPrice();
+
+        params.fundingParams = perpetual.amm().lastFundingState();
+        (params.oraclePrice, params.oracleTime) = perpetual.amm().indexPrice();
     }
 }
 
