@@ -4,7 +4,7 @@ const ShareToken = artifacts.require('token/ShareToken.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const AMM = artifacts.require('liquidity/AMM.sol');
 const Proxy = artifacts.require('proxy/Proxy.sol');
-const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 
 module.exports = async function (deployer, network, accounts) {
     // const priceFeeder = await InversedChainlinkAdapter.deployed();

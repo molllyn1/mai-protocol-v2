@@ -1,5 +1,5 @@
 const ContractReader = artifacts.require('reader/ContractReader.sol');
-const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
 
 module.exports = async function (deployer, network, accounts) {

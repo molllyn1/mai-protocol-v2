@@ -1,5 +1,5 @@
-const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 
 module.exports = async function (deployer, network, accounts) {
-    await deployer.deploy(GlobalConfig, { gas: 850000 });
+    await deployer.deploy(GlobalConfig, { gas: 1000000 });
 };
