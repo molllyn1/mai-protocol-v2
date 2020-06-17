@@ -76,4 +76,12 @@ interface IPerpetual {
     function isValidLotSize(uint256 amount) external view returns (bool);
 
     function isValidTradingLotSize(uint256 amount) external view returns (bool);
+
+    function pause() external;
+
+    function unpause() external;
+
+    function disableWithdraw() external;
+
+    function enableWithdraw() external;
 }
