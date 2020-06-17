@@ -210,6 +210,11 @@ contract('exchange-user', accounts => {
         assert.equal(fromWad(await perpetual.maintenanceMargin.call(u2)), 300);
         assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 9220);
 
+        assert.equal(fromWad(await cashBalanceOf(u3)), 0);
+        assert.equal(fromWad(await positionEntryValue(u3)), 0);
+        assert.equal(fromWad(await perpetual.maintenanceMargin.call(u3)), 0);
+        assert.equal(fromWad(await perpetual.availableMargin.call(u3)), 0);
+
         assert.equal(fromWad(await cashBalanceOf(admin)), 120);
         assert.equal(fromWad(await cashBalanceOf(dev)), 180);
     });
