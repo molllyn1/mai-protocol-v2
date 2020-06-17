@@ -113,15 +113,16 @@ const getOrderHash = order => {
     );
 };
 
-const getOrderSignature = async (order) => {
+const getOrderSignature = async (order, signer) => {
     const orderHash = getOrderHash(order);
     const newWeb3 = getWeb3();
 
     // This depends on the client, ganache-cli/testrpc auto prefix the message header to message
     // So we have to set the method ID to 0 even through we use web3.eth.sign
-    const signature = fromRpcSig(await newWeb3.eth.sign(orderHash, order.trader));
+    signer = signer || order.trader;
+    const signature = fromRpcSig(await newWeb3.eth.sign(orderHash, signer));
     signature.config = `0x${signature.v.toString(16)}00` + '0'.repeat(60);
-    const isValid = isValidSignature(order.trader, signature, orderHash);
+    const isValid = isValidSignature(signer, signature, orderHash);
 
     assert.equal(true, isValid);
     order.signature = signature;
@@ -141,7 +142,7 @@ const getExpiredAt = orderParam => {
     return now + 86400;
 };
 
-const buildOrder = async (orderParam, perpetual, broker) => {
+const buildOrder = async (orderParam, perpetual, broker, signer) => {
     const order = {
         trader: orderParam.trader,
         broker: broker,
@@ -161,7 +162,7 @@ const buildOrder = async (orderParam, perpetual, broker) => {
             orderParam.chainId || 1
         ),
     };
-    await getOrderSignature(order);
+    await getOrderSignature(order, signer);
     return order;
 };
 

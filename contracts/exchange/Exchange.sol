@@ -17,12 +17,12 @@ contract Exchange {
 
     // to verify the field in order data, increase if there are incompatible update in order's data.
     uint256 public constant SUPPORTED_ORDER_VERSION = 2;
-
     IGlobalConfig public globalConfig;
 
     // order status
     mapping(bytes32 => uint256) public filled;
     mapping(bytes32 => bool) public cancelled;
+    mapping(address => mapping(address => address)) public delegators;
 
     event MatchWithOrders(
         address perpetual,
@@ -32,9 +32,27 @@ contract Exchange {
     );
     event MatchWithAMM(address perpetual, LibOrder.OrderParam takerOrderParam, uint256 amount);
     event Cancel(bytes32 indexed orderHash);
+    event UpdateDelegate(address indexed trader, address indexed perpetual, address indexed newDelegator);
 
     constructor(address _globalConfig) public {
         globalConfig = IGlobalConfig(_globalConfig);
+    }
+
+    function setDelegator(address perpetual, address newDelegator) external {
+        require(delegators[msg.sender][perpetual] != newDelegator, "delegate already set");
+        delegators[msg.sender][perpetual] = newDelegator;
+        emit UpdateDelegate(msg.sender, perpetual, newDelegator);
+    }
+
+    function unsetDelegator(address perpetual) external {
+        require(delegators[msg.sender][perpetual] != address(0), "delegate not set");
+        delete delegators[msg.sender][perpetual];
+        emit UpdateDelegate(msg.sender, perpetual, address(0));
+    }
+
+    function isDelegator(address trader, address perpetual, address target) public view returns (bool) {
+        address delegator = delegators[trader][perpetual];
+        return delegator != address(0) && target == delegator;
     }
 
     /**
@@ -231,7 +249,6 @@ contract Exchange {
         require(takerOrderParam.isSell() ? takerPrice <= makerPrice : takerPrice >= makerPrice, "price not match");
     }
 
-
     /**
      * @dev Validate fields of order.
      *
@@ -250,7 +267,11 @@ contract Exchange {
 
         bytes32 orderHash = orderParam.getOrderHash(address(perpetual), msg.sender);
         require(!cancelled[orderHash], "cancelled order");
-        require(orderParam.signature.isValidSignature(orderHash, orderParam.trader), "invalid signature");
+        address signer = orderParam.signature.getSigner(orderHash);
+        require(
+            signer == orderParam.trader || isDelegator(orderParam.trader, address(perpetual), signer),
+            "invalid signature"
+        );
         require(filled[orderHash] < orderParam.amount, "fullfilled order");
 
         return orderHash;

@@ -13,6 +13,35 @@ library LibSignature {
     }
 
     /**
+     * @dev Get signer from signature and hash.
+     *
+     * @param signature The signature data passed along with the order to validate against
+     * @param hash Hash bytes calculated by taking the hash of the passed order data
+     * @return True if the calculated signature matches the order signature data, false otherwise.
+     */
+    function getSigner(OrderSignature memory signature, bytes32 hash)
+        internal
+        pure
+        returns (address recovered)
+    {
+        uint8 method = uint8(signature.config[1]);
+        uint8 v = uint8(signature.config[0]);
+
+        if (method == uint8(SignatureMethod.ETH_SIGN)) {
+            recovered = recover(
+                keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),
+                v,
+                signature.r,
+                signature.s
+            );
+        } else if (method == uint8(SignatureMethod.EIP712)) {
+            recovered = recover(hash, v, signature.r, signature.s);
+        } else {
+            revert("invalid sign method");
+        }
+    }
+
+    /**
      * Validate a signature given a hash calculated from the order data, the signer, and the
      * signature data passed in with the order.
      *
@@ -28,24 +57,7 @@ library LibSignature {
         pure
         returns (bool)
     {
-        uint8 method = uint8(signature.config[1]);
-        address recovered;
-        uint8 v = uint8(signature.config[0]);
-
-        if (method == uint8(SignatureMethod.ETH_SIGN)) {
-            recovered = recover(
-                keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),
-                v,
-                signature.r,
-                signature.s
-            );
-        } else if (method == uint8(SignatureMethod.EIP712)) {
-            recovered = recover(hash, v, signature.r, signature.s);
-        } else {
-            revert("invalid sign method");
-        }
-
-        return signerAddress == recovered;
+        return signerAddress == getSigner(signature, hash);
     }
 
     // see "@openzeppelin/contracts/cryptography/ECDSA.sol"
