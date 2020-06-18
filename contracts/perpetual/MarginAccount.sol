@@ -33,7 +33,7 @@ contract MarginAccount is Collateral {
       * @return Max liquidatable amount, note this amount is not aligned to lotSize.
       */
     function calculateLiquidateAmount(address trader, uint256 liquidationPrice) public returns (uint256) {
-        require(liquidationPrice > 0, "liquidationPrice must not be 0");
+        require(liquidationPrice > 0, "liquidation price must not be 0");
         if (marginAccounts[trader].size == 0) {
             return 0;
         }

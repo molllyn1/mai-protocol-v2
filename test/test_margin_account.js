@@ -333,7 +333,7 @@ contract('TestMarginAccount', accounts => {
                 await marginAccount.calculateLiquidateAmount.call(u1, 0);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("liquidationPrice must not be 0"));
+                assert.ok(error.message.includes("liquidation price must not be 0"));
             }
         });
 
