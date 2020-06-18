@@ -8,7 +8,7 @@ module.exports = async function (deployer, network, accounts) {
     // ropsten https://docs.chain.link/docs/using-chainlink-reference-contracts#section-test-reference-data-contracts-ropsten
     //   eth/usd 0x8468b2bDCE073A157E560AA4D9CcF6dB1DB98507
 
-    await deployer.deploy(ChainlinkAdapter, '0xF79D6aFBb6dA890132F9D7c355e3015f15F3406F', 3600 * 6, true, { gas: 650000 });
+    await deployer.deploy(ChainlinkAdapter, '0xF79D6aFBb6dA890132F9D7c355e3015f15F3406F', 3600 * 6, true, { gas: 700000 });
     const priceFeeder = await ChainlinkAdapter.deployed();
 
     console.log('  「 Address summary 」--------------------------------------');
