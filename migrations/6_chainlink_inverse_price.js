@@ -6,7 +6,7 @@ const { fromWad } = require('../test/constants');
 module.exports = async function (deployer, network, accounts) {
     // mainnet
     //   eth/usd 0xF79D6aFBb6dA890132F9D7c355e3015f15F3406F https://feeds.chain.link/eth-usd
-
+    //
     // ropsten https://docs.chain.link/docs/using-chainlink-reference-contracts#section-test-reference-data-contracts-ropsten
     //   eth/usd 0x8468b2bDCE073A157E560AA4D9CcF6dB1DB98507
 
@@ -29,7 +29,6 @@ module.exports = async function (deployer, network, accounts) {
     console.log('  「 Address summary 」--------------------------------------');
     console.log('   > priceFeeder:     ', priceFeeder.address);
     console.log('   > ChainlinkAdapter:', chainlinkAdapter.address);
-
 
     console.log('feed price (test only)...');
     const price = (new BigNumber('1')).div('120').shiftedBy(18).dp(0, BigNumber.ROUND_DOWN);

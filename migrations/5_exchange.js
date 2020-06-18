@@ -3,7 +3,6 @@ const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 const Exchange = artifacts.require('exchange/Exchange.sol');
 
 module.exports = async function (deployer, network, accounts) {
-
     const contractReader = await ContractReader.deployed();
     const globalConfig = await GlobalConfig.deployed();
 

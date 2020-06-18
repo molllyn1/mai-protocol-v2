@@ -1,4 +1,4 @@
-const InversedChainlinkAdapter = artifacts.require('oracle/InversedChainlinkAdapter.sol');
+const ChainlinkAdapter = artifacts.require('oracle/ChainlinkAdapter.sol');
 const { fromWad } = require('../test/constants');
 
 module.exports = async function (deployer, network, accounts) {
@@ -8,8 +8,8 @@ module.exports = async function (deployer, network, accounts) {
     // ropsten https://docs.chain.link/docs/using-chainlink-reference-contracts#section-test-reference-data-contracts-ropsten
     //   eth/usd 0x8468b2bDCE073A157E560AA4D9CcF6dB1DB98507
 
-    await deployer.deploy(InversedChainlinkAdapter, '0x8468b2bDCE073A157E560AA4D9CcF6dB1DB98507', { gas: 650000 });
-    const priceFeeder = await InversedChainlinkAdapter.deployed();
+    await deployer.deploy(ChainlinkAdapter, '0x8468b2bDCE073A157E560AA4D9CcF6dB1DB98507', 3600 * 6, { gas: 650000 });
+    const priceFeeder = await ChainlinkAdapter.deployed();
 
     console.log('  「 Address summary 」--------------------------------------');
     console.log('   > priceFeeder:    ', priceFeeder.address);

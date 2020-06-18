@@ -7,7 +7,6 @@ const Proxy = artifacts.require('proxy/Proxy.sol');
 const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 
 module.exports = async function (deployer, network, accounts) {
-    // const priceFeeder = await InversedChainlinkAdapter.deployed();
     const priceFeeder = await ChainlinkAdapter.deployed();
     const shareToken = await ShareToken.deployed();
     const perpetual = await Perpetual.deployed();

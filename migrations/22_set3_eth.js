@@ -19,4 +19,7 @@ module.exports = async function (deployer, network, accounts) {
 
     console.log('whitelist amm -> exchange');
     await globalConfig.addComponent(amm.address, exchange.address);
+
+    console.log('whitelist broker');
+    await globalConfig.addBroker(accounts[9], {from: accounts[0]});
 };

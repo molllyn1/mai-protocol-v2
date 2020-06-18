@@ -6,5 +6,6 @@ module.exports = async function (deployer, network, accounts) {
     const ctk = '0x0000000000000000000000000000000000000000';
     
     const globalConfig = await GlobalConfig.deployed();
+
     await deployer.deploy(Perpetual, globalConfig.address, dev, ctk, 18, { gas: 6900000 });
 };

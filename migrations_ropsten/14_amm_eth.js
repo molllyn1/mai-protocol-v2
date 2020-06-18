@@ -1,16 +1,16 @@
-const InversedChainlinkAdapter = artifacts.require('oracle/InversedChainlinkAdapter.sol');
+const ChainlinkAdapter = artifacts.require('oracle/ChainlinkAdapter.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const AMM = artifacts.require('liquidity/AMM.sol');
-const Proxy = artifacts.require('proxy/PerpetualProxy.sol');
-const GlobalConfig = artifacts.require('perpetual/GlobalConfig.sol');
+const Proxy = artifacts.require('proxy/Proxy.sol');
+const GlobalConfig = artifacts.require('global/GlobalConfig.sol');
 
 module.exports = async function (deployer, network, accounts) {
-    const globalConfig = await GlobalConfig.deployed();
-    const priceFeeder = await InversedChainlinkAdapter.deployed();
+    const priceFeeder = await ChainlinkAdapter.deployed();
     const shareToken = await ShareToken.deployed();
     const perpetual = await Perpetual.deployed();
     const proxy = await Proxy.deployed();
+    const globalConfig = await GlobalConfig.deployed();
 
     await deployer.deploy(AMM, globalConfig.address, proxy.address, priceFeeder.address, shareToken.address, { gas: 6900000 });
 

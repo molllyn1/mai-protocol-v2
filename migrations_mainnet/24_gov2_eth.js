@@ -14,6 +14,6 @@ module.exports = async function (deployer, network, accounts) {
     await amm.setGovernanceParameter(toBytes32("poolDevFeeRate"), toWad(0.00015)); // 0.075% * 20%
     await amm.setGovernanceParameter(toBytes32("emaAlpha"), "3327787021630616"); // 2 / (600 + 1)
     await amm.setGovernanceParameter(toBytes32("updatePremiumPrize"), toWad(0));
-    await amm.setGovernanceParameter(toBytes32("markPremiumLimit"), toWad(0.005));
-    await amm.setGovernanceParameter(toBytes32("fundingDampener"), toWad(0.0005));
+    await amm.setGovernanceParameter(toBytes32("markPremiumLimit"), toWad(0.006));
+    await amm.setGovernanceParameter(toBytes32("fundingDampener"), toWad(0.002));
 };
