@@ -328,6 +328,15 @@ contract('TestMarginAccount', accounts => {
             await setDefaultGovParameters();
         });
 
+        it('exception', async() => {
+            try {
+                await marginAccount.calculateLiquidateAmount.call(u1, 0);
+                throw null;
+            } catch (error) {
+                assert.ok(error.message.includes("liquidationPrice must not be 0"));
+            }
+        });
+
         it('without loss - long', async () => {
             await collateral.transfer(u1, toWad(10000));
             await collateral.approve(marginAccount.address, infinity, {
