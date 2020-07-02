@@ -31,7 +31,7 @@ contract SocialLossPauser is Ownable {
             .add(perpetualInstance.socialLossPerContract(LibTypes.Side.LONG));
     }
 
-    function beginGlobalSettlement(address perpetual) external {
+    function pausePerpetual(address perpetual) external {
         require(socialLossThresholds[perpetual] > 0, "no threshold set");
 
         int256 totalLoss = totalSocialLoss(perpetual);
