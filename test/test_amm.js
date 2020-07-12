@@ -16,6 +16,7 @@ const {
     infinity,
     Side
 } = require('./constants');
+const { inspect, printFunding } = require('./funcs')
 
 const TestToken = artifacts.require('test/TestToken.sol');
 const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
@@ -877,6 +878,145 @@ contract('amm', accounts => {
             }
         });
 
+        it('removeLiquidity - fee - if price goes up', async () => {
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '147000'); // u1 deposited 7000 * 10 * 2.1
+            await amm.setGovernanceParameter(toBytes32("poolFeeRate"), toWad(0.90));
+            await amm.setGovernanceParameter(toBytes32("poolDevFeeRate"), toWad(0));
+
+            // 1. add liquidity
+            await collateral.transfer(u2, toWad(7000 * 1000 * 3));
+            await perpetual.deposit(toWad(7000 * 1000 * 3), { from: u2 });
+            await amm.addLiquidity(toWad(1000), { from: u2 });
+
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '21147000'); // 147000 + 7000 * 1000 * 3
+            const amm1 = await perpetual.getMarginAccount(proxy.address)
+            assert.equal(fromWad(amm1.cashBalance), 14140000); // 7000 * 10 + 7000 * 1000
+            assert.equal(fromWad(amm1.size), 1010); // 10 + 1000
+            assert.equal(fromWad(await amm.currentAvailableMargin.call()), 7070000); // 7000 * 10 + 7000 * 1000
+
+            // 2. buy
+            await collateral.transfer(u3, toWad(7000 * 20));
+            await perpetual.deposit(toWad(7000 * 20), { from: u3 });
+            await amm.buy(toWad(10), infinity, infinity, { from: u3 }); // p = 7070000 / (1010 - 10) = 7070, fee = 63630
+            
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '21287000'); // 21147000 + 7000 * 20
+            const amm2 = await perpetual.getMarginAccount(proxy.address)
+            assertApproximate(assert, fromWad(amm2.cashBalance), '14204330'); // 14140000 + fee + pnl, pnl = 70 * 10
+            assert.equal(fromWad(amm2.size), 1000); // 1010 - 10
+            assert.equal(fromWad(amm2.entryValue), 7000000); // 7000 * 1000
+            assertApproximate(assert, fromWad(await amm.currentAvailableMargin.call()), '7204330'); // cashBalance - entryValue
+
+            // 3. sell
+            await amm.sell(toWad(10), toWad(0), infinity, { from: u3 }); // p = 7204330 / 1010 = 7133, fee = 64197
+            
+            const amm3 = await perpetual.getMarginAccount(proxy.address)
+            assertApproximate(assert, fromWad(amm3.cashBalance), '14268527'); // 14204330 + fee
+            assert.equal(fromWad(amm3.size), 1010); // 1010 - 10
+            assert.equal(fromWad(amm3.entryValue), 7071330); // old + 7133 * 10
+            assertApproximate(assert, fromWad(await amm.currentAvailableMargin.call()), '7197197'); // cashBalance - entryValue
+
+            // 4. remove liquidity
+            assert.equal(fromWad(await share.balanceOf(u2)), 1000);
+            const u21 = await perpetual.getMarginAccount(u2)
+            assertApproximate(assert, fromWad(u21.cashBalance), '7000000'); // 7000 * 1000
+            assertApproximate(assert, fromWad(u21.size), '1000');
+            
+            // fair = 7197197 / 1010 = 7125.9376237623762376237623762376
+            // short pnl = 1000 * (7000 - fair) = -125937.6237623762376237623762376
+            // share / sigma = 1000 / 1010
+            // 2 * x * share / sigma = 14251875.247524752475247524752475
+            await amm.removeLiquidity(toWad(1000), { from: u2 });
+
+            const u22 = await perpetual.getMarginAccount(u2)
+            assertApproximate(assert, fromWad(u22.cashBalance), '21125937.623762376237623764'); // cash + 2 * x * share / sigma + pnl
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '21287000');
+            
+            await perpetual.withdraw(toWad('21125937.623762376237623764'), { from: u2 })
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '161062.376237623762376236'); // 21287000 - 21125937.623762376237623764
+
+            // 5. remove liquidity
+            await amm.removeLiquidity(toWad('9.999999999999999999'), { from: u1 });
+            
+            const u12 = await perpetual.getMarginAccount(u1)
+            assertApproximate(assert, fromWad(u12.cashBalance), '148259.376237623762361873'); // 7000 + 141259.376237623762361873
+            await perpetual.withdraw(toWad('148259'), { from: u1 })
+            
+            // assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), 21287000); // u1 deposited 7000 * 10 * 2.1
+            // await inspect(u1, perpetual, proxy, amm)
+            // await inspect(u2, perpetual, proxy, amm)
+            // await inspect(proxy.address, perpetual, proxy, amm)
+            // console.log("balance of perp", fromWad(await collateral.balanceOf(perpetual.address)))
+        });
+
+        it('removeLiquidity - fee - if price goes down', async () => {
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '147000'); // u1 deposited 7000 * 10 * 2.1
+            await amm.setGovernanceParameter(toBytes32("poolFeeRate"), toWad(0.90));
+            await amm.setGovernanceParameter(toBytes32("poolDevFeeRate"), toWad(0));
+
+            // 1. add liquidity
+            await collateral.transfer(u2, toWad(7000 * 1000 * 3));
+            await perpetual.deposit(toWad(7000 * 1000 * 3), { from: u2 });
+            await amm.addLiquidity(toWad(1000), { from: u2 });
+
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '21147000'); // 147000 + 7000 * 1000 * 3
+            const amm1 = await perpetual.getMarginAccount(proxy.address)
+            assert.equal(fromWad(amm1.cashBalance), 14140000); // 7000 * 10 + 7000 * 1000
+            assert.equal(fromWad(amm1.size), 1010); // 10 + 1000
+            assert.equal(fromWad(await amm.currentAvailableMargin.call()), 7070000); // 7000 * 10 + 7000 * 1000
+
+            // 2. sell
+            await collateral.transfer(u3, toWad(7000 * 20));
+            await perpetual.deposit(toWad(7000 * 20), { from: u3 });
+            await amm.sell(toWad(10), toWad(0), infinity, { from: u3 }); // p = 7070000 / (1010 + 10) = 6931.372549019607843137, fee = 62382.352941176470588233
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '21287000'); // 21147000 + 7000 * 20
+            const amm3 = await perpetual.getMarginAccount(proxy.address)
+            assertApproximate(assert, fromWad(amm3.cashBalance), '14202382.352941176470588233'); // 14140000 + fee
+            assert.equal(fromWad(amm3.size), 1020); // 1010 + 10
+            assert.equal(fromWad(amm3.entryValue), '7139313.72549019607843137'); // 7000 * 1010 + price * 10
+            assertApproximate(assert, fromWad(await amm.currentAvailableMargin.call()), '7063068.627450980392156863'); // cashBalance - entryValue
+            
+            // 3. buy
+            await amm.buy(toWad(10), infinity, infinity, { from: u3 }); // p = x / (1020 - 10) = 6993.137254901960784313, fee = 62938.235294117647058817
+            
+            const amm2 = await perpetual.getMarginAccount(proxy.address)
+            assertApproximate(assert, fromWad(amm2.cashBalance), '14265258.68896578239138792'); // old + fee + pnl, pnl = -6.189926951172625913 * 10
+            assert.equal(fromWad(amm2.size), 1010); // 1020 - 10
+            assertApproximate(assert, fromWad(amm2.entryValue), '7069320.453671664744329102'); // old * 1010 / 1020
+            assertApproximate(assert, fromWad(await amm.currentAvailableMargin.call()), '7195938.235294117647058818'); // cashBalance - entryValue
+            
+            // 4. remove liquidity
+            assert.equal(fromWad(await share.balanceOf(u2)), 1000);
+            const u21 = await perpetual.getMarginAccount(u2)
+            assertApproximate(assert, fromWad(u21.cashBalance), '7000000'); // 7000 * 1000
+            assertApproximate(assert, fromWad(u21.size), '1000');
+            
+            // fair = 7124.691322073383808969
+            // short pnl = 1000 * (7000 - fair) = -124691.322073383808969
+            // share / sigma = 1000 / 1010
+            // 2 * x * share / sigma = 14249382.644146767617938253
+            await amm.removeLiquidity(toWad(1000), { from: u2 });
+
+            const u22 = await perpetual.getMarginAccount(u2)
+            assertApproximate(assert, fromWad(u22.cashBalance), '21124691.322073383808969253'); // cash + 2 * x * share / sigma + pnl
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '21287000');
+            
+            await perpetual.withdraw(toWad('21124691.322073383808968'), { from: u2 })
+            assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), '162308.677926616191032'); // 21287000 - 21124691.322073383808968
+            
+            // 5. remove liquidity
+            await amm.removeLiquidity(toWad('9.999999999999999999'), { from: u1 });
+            
+            const u12 = await perpetual.getMarginAccount(u1)
+            assertApproximate(assert, fromWad(u12.cashBalance), '148246.913220733838075704'); // 7000 + 141259.376237623762361873
+            await perpetual.withdraw(toWad('148246'), { from: u1 })
+            
+            // assert.equal(fromWad(await collateral.balanceOf(perpetual.address)), 21287000); // u1 deposited 7000 * 10 * 2.1
+            // await inspect(u1, perpetual, proxy, amm)
+            // await inspect(u2, perpetual, proxy, amm)
+            // await inspect(proxy.address, perpetual, proxy, amm)
+            // console.log("balance of perp", fromWad(await collateral.balanceOf(perpetual.address)))
+        });
+
         it("updateIndex", async () => {
             await perpetual.deposit(toWad(7000), {
                 from: dev
@@ -1240,4 +1380,5 @@ contract('amm', accounts => {
             // await printFunding();
         });
     });
+
 });
