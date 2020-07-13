@@ -1,5 +1,4 @@
 const ChainlinkAdapter = artifacts.require('oracle/ChainlinkAdapter.sol');
-const PriceFeeder = artifacts.require('test/TestPriceFeeder.sol');
 const ShareToken = artifacts.require('token/ShareToken.sol');
 const Perpetual = artifacts.require('perpetual/Perpetual.sol');
 const AMM = artifacts.require('liquidity/AMM.sol');

@@ -28,6 +28,7 @@ const createPool = async (from, ammAddress) => {
 };
 
 const main = async () => {
+    console.log('do not forget to recheck the Perpetual address!!!')
     const addresses = await web3.eth.getAccounts();
     const me = addresses[0];
     const { ammAddress } = await readPerpAddress(Perpetual, AMM, perpetualAddress);

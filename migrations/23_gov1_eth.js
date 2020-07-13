@@ -12,8 +12,8 @@ module.exports = async function (deployer, network, accounts) {
     console.log('default gov...');
     await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.10)); // 10%, should < 1
     await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.075)); // 7.5%, should < initialMarginRate
-    await perpetual.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.005)); // 0.5%, should < maintenanceMarginRate
-    await perpetual.setGovernanceParameter(toBytes32("penaltyFundRate"), toWad(0.005)); // 0.5%, should < maintenanceMarginRate
+    await perpetual.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.015)); // 1.5%, should < maintenanceMarginRate
+    await perpetual.setGovernanceParameter(toBytes32("penaltyFundRate"), toWad(0.01)); // 1.0%, should < maintenanceMarginRate
     await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.00075)); // 0.075%
     await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(-0.00025)); // -0.025%
 

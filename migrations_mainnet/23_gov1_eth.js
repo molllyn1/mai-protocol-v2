@@ -17,6 +17,6 @@ module.exports = async function (deployer, network, accounts) {
     await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.00075)); // 0.075%
     await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(-0.00025)); // -0.025%
 
-    await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(100));
-    await perpetual.setGovernanceParameter(toBytes32("lotSize"), toWad(100));
+    await perpetual.setGovernanceParameter(toBytes32("tradingLotSize"), toWad(10));
+    await perpetual.setGovernanceParameter(toBytes32("lotSize"), toWad(10));
 };
