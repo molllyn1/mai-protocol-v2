@@ -15,6 +15,6 @@ module.exports = async function (deployer, network, accounts) {
     console.log('   > ChainlinkAdapter:', chainlinkAdapter.address);
 
     console.log('feed price (test only)...');
-    const price = (new BigNumber('9000')).shiftedBy(10).dp(0, BigNumber.ROUND_DOWN);
+    const price = (new BigNumber('9000')).shiftedBy(8).dp(0, BigNumber.ROUND_DOWN);
     await priceFeeder.setPrice(price);
 };

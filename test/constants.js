@@ -29,6 +29,13 @@ const fromWad = x => {
     return new BigNumber(x).div(_wad).toString();
 };
 
+const toDecimal = (x, decimals) => {
+    return new BigNumber(x).shiftedBy(decimals).toString();
+}
+
+const fromDecimal = (x, decimals) => {
+    return new BigNumber(x).shiftedBy(-decimals).toString();
+}
 
 const infinity = '999999999999999999999999999999999999999999';
 
@@ -43,6 +50,8 @@ module.exports = {
     fromWei,
     toWad,
     fromWad,
+    toDecimal,
+    fromDecimal,
     infinity,
     Side,
 };

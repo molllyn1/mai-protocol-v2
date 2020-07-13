@@ -1,9 +1,18 @@
 const BigNumber = require('bignumber.js');
 const { perpetualAddress, readPerpAddress } = require('./addresses');
-const { toWei, fromWei, toWad, fromWad, infinity, Side } = require('../test/constants');
+const { toDecimal, fromDecimal, toWad, fromWad, infinity, Side } = require('../test/constants');
 const TestToken = artifacts.require('TestToken');
 const Perpetual = artifacts.require('Perpetual');
 const AMM = artifacts.require('AMM');
+
+const getDecimals = async (ctkAddress) => {
+    const ctk = await TestToken.at(ctkAddress);
+    let decimals = (new BigNumber(await ctk.decimals())).toNumber();
+    if (decimals !== 6 && decimals !== 8 && decimals !== 18) {
+        throw Error(`decimals = ${decimals}, really?`)
+    }
+    return decimals;
+};
 
 const approveCtkToPerpIfRequired = async (from, ctkAddress) => {
     const ctk = await TestToken.at(ctkAddress);
@@ -33,9 +42,10 @@ const main = async () => {
     const addresses = await web3.eth.getAccounts();
     const me = addresses[0];
     const { ctkAddress, ammAddress } = await readPerpAddress(Perpetual, AMM, perpetualAddress);
+    const decimals = await getDecimals(ctkAddress);
 
     await approveCtkToPerpIfRequired(me, ctkAddress);
-    await deposit(me, toWad(0.001 * 9000 * 2 * 1.5));
+    await deposit(me, toDecimal(0.001 * 9000 * 2 * 1.5, decimals));
     await createPool(me, ammAddress);
     console.log('jobs done');
 };
