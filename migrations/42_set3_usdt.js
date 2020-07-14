@@ -21,5 +21,6 @@ module.exports = async function (deployer, network, accounts) {
     await globalConfig.addComponent(amm.address, exchange.address);
     
     console.log('whitelist broker');
-    await globalConfig.addBroker(accounts[9], {from: accounts[0]});
+    // alreadt added in 23
+    //await globalConfig.addBroker(accounts[9]);
 };
