@@ -847,7 +847,7 @@ contract('exchange-user', accounts => {
                 await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(0.1)]);
                 throw null;
             } catch (error) {
-                assert.ok(error.message.includes("maker unsafe"), error);
+                assert.ok(error.message.includes("taker unsafe"), error);
             }
         });
 

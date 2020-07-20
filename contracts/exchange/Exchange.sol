@@ -93,7 +93,7 @@ contract Exchange {
         if (takerOpened > 0) {
             require(perpetual.isIMSafe(takerOrderParam.trader), "taker initial margin unsafe");
         } else {
-            require(perpetual.isSafe(takerOrderParam.trader), "maker unsafe");
+            require(perpetual.isSafe(takerOrderParam.trader), "taker unsafe");
         }
         require(perpetual.isSafe(msg.sender), "broker unsafe");
 
