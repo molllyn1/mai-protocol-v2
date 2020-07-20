@@ -743,8 +743,9 @@ contract AMM is AMMGovernance {
         uint256 perpetualMarkPrice = perpetualProxy.markPrice();
         if (opened > 0) {
             require(perpetualProxy.isIMSafeWithPrice(trader, perpetualMarkPrice), "im unsafe");
+        } else {
+            require(perpetualProxy.isSafeWithPrice(trader, perpetualMarkPrice), "sender unsafe");
         }
-        require(perpetualProxy.isSafeWithPrice(trader, perpetualMarkPrice), "sender unsafe");
         require(perpetualProxy.isSafeWithPrice(tradingAccount(), perpetualMarkPrice), "amm unsafe");
     }
 
