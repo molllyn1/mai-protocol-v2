@@ -174,10 +174,15 @@ function assertApproximate(assert, actual, expected, limit) {
         limit = new BigNumber("1e-12");
     }
     actual = new BigNumber(actual);
+    if (!actual.isFinite()) {
+        assert.fail(actual.toString(), expected.toString());
+        return
+    }
     expected = new BigNumber(expected);
     const abs = actual.minus(expected).abs();
     if (abs.gt(limit)) {
         assert.fail(actual.toString(), expected.toString());
+        return
     }
 }
 
