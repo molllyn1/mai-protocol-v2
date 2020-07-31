@@ -11,12 +11,12 @@ interface IGlobalConfig {
     function transferOwnership(address newOwner) external;
 
     function brokers(address broker) external view returns (bool);
-    
+
     function pauseControllers(address broker) external view returns (bool);
 
     function withdrawControllers(address broker) external view returns (bool);
 
-    function addBroker() external;
+    function addBroker(address broker) external;
 
     function removeBroker() external;
 

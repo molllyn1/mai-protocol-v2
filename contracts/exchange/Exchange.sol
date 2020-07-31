@@ -322,14 +322,16 @@ contract Exchange {
         if (feeRate == 0) {
             return;
         }
-        int256 hard = price.wmul(openedAmount).toInt256().wmul(feeRate);
-        int256 soft = price.wmul(closedAmount).toInt256().wmul(feeRate);
-        int256 fee = hard.add(soft);
         address devAddress = perpetual.devAddress();
+        int256 available = perpetual.availableMargin(trader);
+        int256 openFee = price.wmul(openedAmount).toInt256().wmul(feeRate);
+        require(openFee <= 0 || available >= openFee, "available margin too low for fee");
+        int256 closeFee = price.wmul(closedAmount).toInt256().wmul(feeRate);
+        if (closeFee > 0) {
+            closeFee = available < 0? 0: closeFee.min(available);
+        }
+        int256 fee = openFee.add(closeFee);
         if (fee > 0) {
-            int256 available = perpetual.availableMargin(trader);
-            require(available >= hard, "available margin too low for fee");
-            fee = fee.min(available);
             perpetual.transferCashBalance(trader, devAddress, fee.toUint256());
         } else if (fee < 0) {
             perpetual.transferCashBalance(devAddress, trader, fee.neg().toUint256());

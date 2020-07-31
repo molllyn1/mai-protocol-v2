@@ -22,3 +22,4 @@ contract TestPriceFeeder {
         timestamp = latestTimestamp;
     }
 }
+
