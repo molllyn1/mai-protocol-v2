@@ -2,7 +2,10 @@ const assert = require('assert');
 const BigNumber = require('bignumber.js');
 const {
     increaseEvmBlock,
-    toBytes32
+    toBytes32,
+    assertApproximate,
+    inspect,
+    printFunding 
 } = require('./funcs');
 const {
     toWad,
@@ -305,11 +308,11 @@ contract('TestPerpetual', async accounts => {
             await perpetual.depositFor(u1, toWad(1000));
 
             await collateral.transfer(u2, toWad(1000));
-            await collateral.approve(perpetual.address, infinity, { from: u2});
+            await collateral.approve(perpetual.address, infinity, { from: u2 });
             await perpetual.depositFor(u2, toWad(1000));
 
             await collateral.transfer(u3, toWad(1000));
-            await collateral.approve(perpetual.address, infinity, { from: u3});
+            await collateral.approve(perpetual.address, infinity, { from: u3 });
             await perpetual.depositFor(u3, toWad(1000));
 
 
@@ -495,6 +498,41 @@ contract('TestPerpetual', async accounts => {
 
             assert.equal(await positionSize(u2), 0);
             assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 2400 + 19.5);
+        });
+
+        it('inversed large penalty', async () => {
+            await perpetual.setGovernanceParameter(toBytes32("initialMarginRate"), toWad(0.5));
+            await perpetual.setGovernanceParameter(toBytes32("maintenanceMarginRate"), toWad(0.2));
+            await perpetual.setGovernanceParameter(toBytes32("liquidationPenaltyRate"), toWad(0.15));
+            await perpetual.setGovernanceParameter(toBytes32("penaltyFundRate"), toWad(0.05));   
+
+            await collateral.transfer(u2, toWad(1000));
+            await perpetual.depositFor(u2, toWad(1000));
+
+            await funding.setMarkPrice(toWad(1 / 10));
+            await perpetual.oneSideTradePublic(u1, LONG, toWad(1 / 10), toWad(20000));
+            await funding.setMarkPrice(toWad(1 / 16.5));
+
+            assertApproximate(assert, fromWad(await perpetual.marginBalance.call(u1)), 212.121, 0.1);
+            assertApproximate(assert, fromWad(await perpetual.maintenanceMargin.call(u1)), 242.424, 0.1);
+            // await inspect(u1, perpetual, funding, funding);
+            
+            // console.log('insuranceFund', fromWad(await perpetual.insuranceFundBalance()));
+            await perpetual.liquidate(u1, toWad(20000), { from: u2 });
+            // assertApproximate(assert, fromWad(perpetual.maintenanceMargin.call(u2)), 242.424, 0.1);
+            // await inspect(u1, perpetual, funding, funding);
+            // await inspect(u2, perpetual, funding, funding);
+            // console.log('insuranceFund', fromWad(await perpetual.insuranceFundBalance()));
+
+            // keeper penalty = 1/16.5 * 20000 * 15% = 181.81
+            // fund penalty = 1/16.5 * 20000 * 5% = 60.60
+            // But u1.marginBalance - u1.MM = -30.30, this loss is also payed by fund
+            const keeper2 = await perpetual.getMarginAccount(u2);
+            assertApproximate(assert, fromWad(keeper2.cashBalance), 2000 + 181.81, 0.1);
+            assertApproximate(assert, fromWad(await perpetual.insuranceFundBalance()), 30.30, 0.1);
+
+            // assert.equal(await positionSize(u2), 0);
+            // assert.equal(fromWad(await perpetual.availableMargin.call(u2)), 2400 + 19.5);
         });
     });
 

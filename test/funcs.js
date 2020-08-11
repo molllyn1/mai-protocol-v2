@@ -192,14 +192,12 @@ function sleep(ms) {
 
 const inspect = async (user, perpetual, proxy, amm) => {
     const markPrice = await amm.currentMarkPrice.call();
-    const cash = await perpetual.getCashBalance(user);
-    const position = await perpetual.getPosition(user);
+    const position = await perpetual.getMarginAccount(user);
     console.log("  ACCOUNT STATISTIC for", user);
     console.log("  markPrice", fromWad(markPrice));
     console.log("  ┌─────────────────────────┬────────────");
     console.log("  │ COLLATERAL              │");
-    console.log("  │   cashBalance           │", fromWad(cash.balance));
-    console.log("  │   appliedWithdrawal     │", fromWad(cash.appliedBalance));
+    console.log("  │   cashBalance           │", fromWad(position.cashBalance));
     console.log("  │ POSITION                │");
     console.log("  │   side                  │", position.side == Side.LONG ? "LONG" : (position.side == Side.SHORT ? "SHORT" : "FLAT"));
     console.log("  │   size                  │", fromWad(position.size));
@@ -211,16 +209,12 @@ const inspect = async (user, perpetual, proxy, amm) => {
     console.log("  │   marginBalance         │", fromWad(await perpetual.marginBalance.call(user)));
     console.log("  │   maintenanceMargin     │", fromWad(await perpetual.maintenanceMargin.call(user)));
     console.log("  │   pnl                   │", fromWad(await perpetual.pnl.call(user)));
-    console.log("  │   drawableBalance       │", fromWad(await perpetual.drawableBalance.call(user)));
     console.log("  │   availableMargin       │", fromWad(await perpetual.availableMargin.call(user)));
     if (user === proxy.address) {
         console.log("  │   availableMargin(Pool) │", fromWad(await amm.currentAvailableMargin.call()));
     }
     console.log("  │   isSafe                │", await perpetual.isSafe.call(user));
     console.log("  │   isBankrupt            │", await perpetual.isBankrupt.call(user));
-    console.log("  │ Broker                  │");
-    console.log("  │   broker                │", (await perpetual.getBroker(user)).current.broker);
-    console.log("  │   height                │", (await perpetual.getBroker(user)).current.appliedHeight);
     console.log("  └─────────────────────────┴────────────");
     console.log("");
 };
