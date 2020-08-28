@@ -37,7 +37,8 @@ const fromDecimal = (x, decimals) => {
     return new BigNumber(x).shiftedBy(-decimals).toString();
 }
 
-const infinity = '999999999999999999999999999999999999999999';
+// const infinity = '999999999999999999999999999999999999999999';
+const infinity = '9999999999999999999999999999'; // less than uint96
 
 const Side = {
     FLAT: 0,

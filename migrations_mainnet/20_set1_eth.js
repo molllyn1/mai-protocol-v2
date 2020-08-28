@@ -7,5 +7,12 @@ module.exports = async function (deployer, network, accounts) {
 
     console.log('set minter...');
     await shareToken.addMinter(amm.address);
-    // await shareToken.renounceMinter(); // uncomment this line will denial future addMinter() requests
+
+    const admin1 = ''
+    if (!admin1) {
+        throw 'please set an admin'
+    }
+    await shareToken.addMinter(admin1);
+
+    await shareToken.renounceMinter(); // uncomment this line will denial future addMinter() requests
 };
