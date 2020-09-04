@@ -114,6 +114,7 @@ contract Exchange {
             require(perpetual.isSafe(takerOrderParam.trader), "maker unsafe");
         }
         require(perpetual.isSafe(msg.sender), "broker unsafe");
+        require(perpetual.isSafe(perpetual.devAddress()), "dev unsafe");
 
         filled[takerOrderHash] = takerFilledAmount;
     }
@@ -336,7 +337,6 @@ contract Exchange {
             perpetual.transferCashBalance(trader, devAddress, fee.toUint256());
         } else if (fee < 0) {
             perpetual.transferCashBalance(devAddress, trader, fee.neg().toUint256());
-            require(perpetual.isSafe(devAddress), "dev unsafe");
         }
     }
 
