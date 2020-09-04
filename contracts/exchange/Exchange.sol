@@ -326,6 +326,7 @@ contract Exchange {
         int256 available = perpetual.availableMargin(trader);
         int256 openFee = price.wmul(openedAmount).toInt256().wmul(feeRate);
         require(openFee <= 0 || available >= openFee, "available margin too low for fee");
+
         int256 closeFee = price.wmul(closedAmount).toInt256().wmul(feeRate);
         if (closeFee > 0) {
             closeFee = available < 0? 0: closeFee.min(available);
