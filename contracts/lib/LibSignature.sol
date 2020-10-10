@@ -17,7 +17,7 @@ library LibSignature {
      *
      * @param signature The signature data passed along with the order to validate against
      * @param hash Hash bytes calculated by taking the hash of the passed order data
-     * @return True if the calculated signature matches the order signature data, false otherwise.
+     * @return Address of signer recovered from signature and hash.
      */
     function getSigner(OrderSignature memory signature, bytes32 hash)
         internal
