@@ -295,4 +295,188 @@ contract('exchange-user', accounts => {
 
         await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
     });
+
+    it("dev fee - H01 - open/close", async () => {
+        await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.01));
+        await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0.01));
+
+        await collateral.transfer(u1, toWad(1000));
+        await collateral.approve(perpetual.address, infinity, { from: u1 });
+        await collateral.transfer(u2, toWad(1000));
+        await collateral.approve(perpetual.address, infinity, { from: u2 });
+
+        // @6000, u1 = 600, u2 = 600
+        await perpetual.deposit(toWad(660), { from: u1 });
+        await perpetual.deposit(toWad(660), { from: u2 });
+        await funding.setMarkPrice(toWad(6000));
+        var takerParam = await buildOrder({
+            trader: u1,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'sell',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 0,
+            takerFeeRate: 0,
+            salt: 666,
+        }, perpetual.address, admin);
+        var makerParam = await buildOrder({
+            trader: u2,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'buy',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 0,
+            takerFeeRate: 0,
+            salt: 666,
+        }, perpetual.address, admin);
+        await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
+        assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 600);
+        assert.equal(fromWad(await perpetual.marginBalance.call(u2)), 600);
+
+        // @6539.9, u1 ~= 60.099, u2 ~= 1139.899
+        await funding.setMarkPrice(toWad(6539.9));
+        // u1 cannot open
+        var takerParam = await buildOrder({
+            trader: u1,
+            amount: 0.1,
+            price: 6000,
+            version: 2,
+            side: 'sell',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 1000,
+            takerFeeRate: 1000,
+            salt: 666,
+        }, perpetual.address, admin);
+
+        var makerParam = await buildOrder({
+            trader: u2,
+            amount: 0.1,
+            price: 6000,
+            version: 2,
+            side: 'buy',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 1000,
+            takerFeeRate: 1000,
+            salt: 666,
+        }, perpetual.address, admin);
+
+        try {
+            await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(0.1)]);
+            throw null;
+        } catch (error) {
+            assert.ok(error.message.includes("available margin too low for fee"));
+        }
+
+        // @6580, u1 ~= 20, u2 ~= 1180
+        await funding.setMarkPrice(toWad(6580));
+        // u1 cannot open
+        var takerParam = await buildOrder({
+            trader: u1,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'buy',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 1000,
+            takerFeeRate: 1000,
+            salt: 666,
+        }, perpetual.address, admin);
+
+        var makerParam = await buildOrder({
+            trader: u2,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'sell',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 1000,
+            takerFeeRate: 1000,
+            salt: 666,
+        }, perpetual.address, admin);
+        await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
+    });
+
+    it("dev fee - H01 - close + open", async () => {
+        await perpetual.setGovernanceParameter(toBytes32("takerDevFeeRate"), toWad(0.01));
+        await perpetual.setGovernanceParameter(toBytes32("makerDevFeeRate"), toWad(0.01));
+
+        await collateral.transfer(u1, toWad(1000));
+        await collateral.approve(perpetual.address, infinity, { from: u1 });
+        await collateral.transfer(u2, toWad(1000));
+        await collateral.approve(perpetual.address, infinity, { from: u2 });
+
+        // @6000, u1 = 600, u2 = 600
+        await perpetual.deposit(toWad(660), { from: u1 });
+        await perpetual.deposit(toWad(660), { from: u2 });
+        await funding.setMarkPrice(toWad(6000));
+        var takerParam = await buildOrder({
+            trader: u1,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'sell',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 0,
+            takerFeeRate: 0,
+            salt: 666,
+        }, perpetual.address, admin);
+        var makerParam = await buildOrder({
+            trader: u2,
+            amount: 1,
+            price: 6000,
+            version: 2,
+            side: 'buy',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 0,
+            takerFeeRate: 0,
+            salt: 666,
+        }, perpetual.address, admin);
+        await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
+        assert.equal(fromWad(await perpetual.marginBalance.call(u1)), 600);
+        assert.equal(fromWad(await perpetual.marginBalance.call(u2)), 600);
+
+        // @6533.9, u1 ~= 66.099
+        // - expect dev fee = 6533.9 * 1.1 * 0.01 = 71.8729
+        // - avail margin = 0
+        // - actual dev fee = 0
+        await funding.setMarkPrice(toWad(6533.9));
+        var takerParam = await buildOrder({
+            trader: u1,
+            amount: 1.1,
+            price: 6533.9,
+            version: 2,
+            side: 'buy',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 0,
+            takerFeeRate: 0,
+            salt: 666,
+        }, perpetual.address, admin);
+        var makerParam = await buildOrder({
+            trader: u2,
+            amount: 1.1,
+            price: 6533.9,
+            version: 2,
+            side: 'sell',
+            type: 'limit',
+            expiredAtSeconds: 86400,
+            makerFeeRate: 0,
+            takerFeeRate: 0,
+            salt: 666,
+        }, perpetual.address, admin);
+        await exchange.matchOrders(takerParam, [makerParam], perpetual.address, [toWad(1)]);
+
+        // 66.099999999999999999 - 65.339 = 0.760999999999999999
+        assert.equal(await perpetual.availableMargin.call(u1), 760999999999999999);
+    });
 });

@@ -334,6 +334,7 @@ contract Exchange {
         }
         int256 fee = openFee.add(closeFee);
         if (fee > 0) {
+            fee = fee.min(available);
             perpetual.transferCashBalance(trader, devAddress, fee.toUint256());
         } else if (fee < 0) {
             perpetual.transferCashBalance(devAddress, trader, fee.neg().toUint256());
