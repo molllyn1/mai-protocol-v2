@@ -273,7 +273,7 @@ contract Exchange {
             signer == orderParam.trader || isDelegator(orderParam.trader, address(perpetual), signer),
             "invalid signature"
         );
-        require(filled[orderHash] < orderParam.amount, "fullfilled order");
+        require(filled[orderHash] < orderParam.amount, "fulfilled order");
 
         return orderHash;
     }
