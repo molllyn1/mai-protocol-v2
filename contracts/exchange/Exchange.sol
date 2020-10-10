@@ -38,18 +38,38 @@ contract Exchange {
         globalConfig = IGlobalConfig(_globalConfig);
     }
 
+    /**
+     * Set an account as delegator of sender.
+     *
+     * @param perpetual     Address of perpetual, on which the delegator is allowed to trade.
+     * @param newDelegator  Address of delegator.
+     */
     function setDelegator(address perpetual, address newDelegator) external {
+        require(newDelegator != address(0), "invalid delegator address");
         require(delegators[msg.sender][perpetual] != newDelegator, "delegate already set");
         delegators[msg.sender][perpetual] = newDelegator;
         emit UpdateDelegate(msg.sender, perpetual, newDelegator);
     }
 
+    /**
+     * Disable current delegator of sender (by setting delegator to 0x0).
+     *
+     * @param perpetual     Address of perpetual, on which the delegator is allowed to trade.
+     */
     function unsetDelegator(address perpetual) external {
         require(delegators[msg.sender][perpetual] != address(0), "delegate not set");
         delete delegators[msg.sender][perpetual];
         emit UpdateDelegate(msg.sender, perpetual, address(0));
     }
 
+    /**
+     * Test if a account is delegator of trader.
+     *
+     * @param trader        Address of trader.
+     * @param perpetual     Address of perpetual, on which the delegator is allowed to trade.
+     * @param target        Address of delegator to be checked.
+     * @return True if the address of target is the delegator set by trader, otherwise false.
+     */
     function isDelegator(address trader, address perpetual, address target) public view returns (bool) {
         address delegator = delegators[trader][perpetual];
         return delegator != address(0) && target == delegator;
