@@ -18,7 +18,7 @@ interface IGlobalConfig {
 
     function addBroker(address broker) external;
 
-    function removeBroker() external;
+    function removeBroker(address broker) external;
 
     function isComponent(address component) external view returns (bool);
 
